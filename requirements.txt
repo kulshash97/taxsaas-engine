@@ -1,0 +1,11 @@
+streamlit
+pdfplumber
+pandas
+google-genai
+pydantic
+fpdf
+feedparser
+beautifulsoup4
+requests
+reportlab
+PyPDF2
