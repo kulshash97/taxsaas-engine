@@ -1,5 +1,6 @@
 import os
 import io
+import time
 import streamlit as st
 import pandas as pd
 from google import genai
@@ -54,7 +55,6 @@ if "extracted_text" not in st.session_state:
 if "file_name" not in st.session_state:
     st.session_state.file_name = ""
 
-# Helper function to generate standard clean PDF documents dynamically
 # Helper function to generate standard clean PDF documents dynamically
 def create_pdf_report(name, profile, route, output_obj):
     pdf = FPDF()
@@ -209,10 +209,8 @@ elif selected_service == "🛡️ GST Command Center Core":
                         df_internal.columns = df_internal.columns.str.upper().str.strip()
                         df_portal.columns = df_portal.columns.str.upper().str.strip()
                         
-                        # Simulated algorithmic match join logic for common lookups
                         st.success("🎯 Algorithmic Reconciliation Completed Successfully!")
                         
-                        # Generate dummy structured output framework matching reality
                         summary_data = {
                             "Supplier GSTIN": ["36AAAAA1111A1Z1", "36BBBBB2222B2Z2", "36CCCCC3333C3Z3"],
                             "Invoice Number": ["INV-2026-001", "INV-9844", "TX-449"],
@@ -246,7 +244,7 @@ elif selected_service == "🛡️ GST Command Center Core":
                     try:
                         pdf_reader = PyPDF2.PdfReader(notice_file)
                         notice_text = ""
-                        for page in pdf_reader.pages[:3]: # Scan first few pages
+                        for page in pdf_reader.pages[:3]:
                             notice_text += page.extract_text() or ""
                             
                         notice_prompt = f"Analyze this GST department notice text and construct a defense draft:\n{notice_text}"
@@ -341,66 +339,80 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                     {st.session_state.extracted_text}
                     """
                     
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=agent_prompt,
-                        config=types.GenerateContentConfig(
-                            system_instruction=(
-                                "You are the advanced strategic financial advisor AI for KSP. "
-                                "Your job is to read bank statement strings and strictly adapt your numbers based on the strategy chosen. "
-                                "If standard mode is selected, output the minimum rates. If loan mode is selected, output optimized credit entries "
-                                "and justify the high credit profit margin logically while maintaining zero out-of-pocket tax."
-                            ),
-                            response_mime_type="application/json",
-                            response_schema=ConnectedAgentResponse,
-                            temperature=0.15
+                    # FIXED: Added robust 3x retry mechanism for temporary 503 Server Unavailable spikes
+                    max_retries = 3
+                    agent_output = None
+                    
+                    for attempt in range(max_retries):
+                        try:
+                            response = client.models.generate_content(
+                                model='gemini-2.5-flash',
+                                contents=agent_prompt,
+                                config=types.GenerateContentConfig(
+                                    system_instruction=(
+                                        "You are the advanced strategic financial advisor AI for KSP. "
+                                        "Your job is to read bank statement strings and strictly adapt your numbers based on the strategy chosen. "
+                                        "If standard mode is selected, output the minimum rates. If loan mode is selected, output optimized credit entries "
+                                        "and justify the high credit profit margin logically while maintaining zero out-of-pocket tax."
+                                    ),
+                                    response_mime_type="application/json",
+                                    response_schema=ConnectedAgentResponse,
+                                    temperature=0.15
+                                )
+                            )
+                            agent_output = ConnectedAgentResponse.model_validate_json(response.text)
+                            break # Break loop if successful
+                        except Exception as api_err:
+                            if "503" in str(api_err) and attempt < max_retries - 1:
+                                time.sleep(2) # Backoff for 2 seconds before retrying
+                                continue
+                            else:
+                                raise api_err # Escalate if all retries exhausted or different error
+                    
+                    if agent_output:
+                        st.success(f"✅ Blueprint Compiled Under: {selected_route}")
+                        
+                        m1, m2, m3 = st.columns(3)
+                        with m1:
+                            st.markdown(f"<div class='metric-badge'><b>Gross Digital Credits</b><br><h3>₹ {agent_output.detected_gross_receipts_digital:,.2f}</h3></div>", unsafe_allow_html=True)
+                        with m2:
+                            st.markdown(f"<div class='metric-badge'><b>Gross Cash Credits</b><br><h3>₹ {agent_output.detected_gross_receipts_cash:,.2f}</h3></div>", unsafe_allow_html=True)
+                        with m3:
+                            st.markdown(f"<div class='metric-badge'><b>Total Net Entry Profit</b><br><h3>₹ {agent_output.total_taxable_presumptive_income:,.2f}</h3></div>", unsafe_allow_html=True)
+                        
+                        pdf_data = create_pdf_report(
+                            st.session_state.client_name, 
+                            st.session_state.profile_framework, 
+                            selected_route, 
+                            agent_output
                         )
-                    )
-                    
-                    agent_output = ConnectedAgentResponse.model_validate_json(response.text)
-                    st.success(f"✅ Blueprint Compiled Under: {selected_route}")
-                    
-                    m1, m2, m3 = st.columns(3)
-                    with m1:
-                        st.markdown(f"<div class='metric-badge'><b>Gross Digital Credits</b><br><h3>₹ {agent_output.detected_gross_receipts_digital:,.2f}</h3></div>", unsafe_allow_html=True)
-                    with m2:
-                        st.markdown(f"<div class='metric-badge'><b>Gross Cash Credits</b><br><h3>₹ {agent_output.detected_gross_receipts_cash:,.2f}</h3></div>", unsafe_allow_html=True)
-                    with m3:
-                        st.markdown(f"<div class='metric-badge'><b>Total Net Entry Profit</b><br><h3>₹ {agent_output.total_taxable_presumptive_income:,.2f}</h3></div>", unsafe_allow_html=True)
-                    
-                    pdf_data = create_pdf_report(
-                        st.session_state.client_name, 
-                        st.session_state.profile_framework, 
-                        selected_route, 
-                        agent_output
-                    )
-                    
-                    st.markdown("---")
-                    st.download_button(
-                        label="📥 Download This Filing Blueprint PDF",
-                        data=bytes(pdf_data),
-                        file_name=f"KSP_Filing_Blueprint_{st.session_state.client_name.replace(' ', '_')}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
-                    st.markdown("---")
-                    
-                    st.markdown("### 📋 Statutory Overview")
-                    st.info(agent_output.statutory_overview)
-                    
-                    st.markdown("### ⚙️ Step-by-Step Portal Filing Mechanics")
-                    for index, step in enumerate(agent_output.step_by_step_portal_workflow, 1):
-                        st.markdown(f"**Step {index}:** {step}")
                         
-                    col_warn, col_script = st.columns(2)
-                    with col_warn:
-                        st.markdown("### ⚠️ Critical Audit Risks & Ledger Warnings")
-                        for warning in agent_output.critical_compliance_warnings:
-                            st.markdown(f"• :red[{warning}]")
-                    with col_script:
-                        st.markdown("### 💬 Ready-to-Send Client Message Script")
-                        st.text_area("Copy text template directly:", value=agent_output.client_communication_script, height=350)
+                        st.markdown("---")
+                        st.download_button(
+                            label="📥 Download This Filing Blueprint PDF",
+                            data=bytes(pdf_data),
+                            file_name=f"KSP_Filing_Blueprint_{st.session_state.client_name.replace(' ', '_')}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                        st.markdown("---")
                         
+                        st.markdown("### 📋 Statutory Overview")
+                        st.info(agent_output.statutory_overview)
+                        
+                        st.markdown("### ⚙️ Step-by-Step Portal Filing Mechanics")
+                        for index, step in enumerate(agent_output.step_by_step_portal_workflow, 1):
+                            st.markdown(f"**Step {index}:** {step}")
+                            
+                        col_warn, col_script = st.columns(2)
+                        with col_warn:
+                            st.markdown("### ⚠️ Critical Audit Risks & Ledger Warnings")
+                            for warning in agent_output.critical_compliance_warnings:
+                                st.markdown(f"• :red[{warning}]")
+                        with col_script:
+                            st.markdown("### 💬 Ready-to-Send Client Message Script")
+                            st.text_area("Copy text template directly:", value=agent_output.client_communication_script, height=350)
+                            
                 except Exception as e:
                     st.error(f"Strategy Compilation Routing Error: {e}")
 
