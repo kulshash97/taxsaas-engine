@@ -70,7 +70,6 @@ def create_unified_pdf_report(name, profile, output_obj):
     def clean_txt(text_str):
         if not text_str:
             return ""
-        # Encode to latin-1 while ignoring/dropping unencodable characters like emojis
         return text_str.encode('latin-1', 'ignore').decode('latin-1')
     
     # Header Banner
@@ -434,7 +433,8 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                                 st.write(f"**{idx}.** {s}")
                             st.markdown("#### 🔵 Loan Optimization Procedure")
                             for idx, s in enumerate(r_loan.step_by_step_portal_workflow, 1):
-                                st.write(f"**{idx}.** {s}")
+                                w = f"**{idx}.** {s}"
+                                st.write(w)
                                 
                         st.markdown("### 📋 Statutory Framework Analysis")
                         st.info(agent_output.statutory_overview)
@@ -453,6 +453,6 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
 
 # Placeholders for Remaining Background Skeletons
 elif selected_service == "🏢 Business Incorporation Strategy Matrix":
-    st.markdown("<div class='hero-card'><h3>🏢 Business Incorporation Strategy Matrix</h3><p>SaaS module engine placeholder.</p></div>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-card'><h3>🏢 Business Incorporation Strategy Matrix</h3><p>Enterprise SaaS orchestration module pipeline framework.</p></div>", unsafe_allow_html=True)
 elif selected_service == "📈 Predictive Fractional CFO Modeling":
-    st.markdown("<div class='hero-card'><h3>📈 Predictive Fractional CFO Modeling</h3><p>SaaS
+    st.markdown("<div class='hero-card'><h3>📈 Predictive Fractional CFO Modeling</h3><p>Predictive multi-variable projection modeling suite dashboard.</p></div>", unsafe_allow_html=True)
