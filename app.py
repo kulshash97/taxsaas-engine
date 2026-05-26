@@ -311,8 +311,8 @@ elif selected_service == "🛡️ GST Command Center Core":
 # MODULE 3: CONSOLIDATED KSP AI COMPLIANCE & FILING AGENT
 # =====================================================================
 elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
-    st.markdown("<div class='main-title'>💼 KULKARNI STRATEGIC PARTNERS</div>", unsafe_allow_title=True)
-    st.markdown("<div class='sub-title'>Enterprise-Grade Financial Optimization & Strategic AI Tax Systems</div>", unsafe_allow_title=True)
+    st.markdown("<div class='main-title'>💼 KULKARNI STRATEGIC PARTNERS</div>", unsafe_allow_html=True)
+    st.markdown("<div class='sub-title'>Enterprise-Grade Financial Optimization & Strategic AI Tax Systems</div>", unsafe_allow_html=True)
     st.markdown("<div class='hero-card'><h3>🤖 Consolidated Master Compliance Agent</h3><p>Compiles, calculates, and reviews both Standard and Loan-Optimized strategies simultaneously into a unified blueprint.</p></div>", unsafe_allow_html=True)
     
     if st.session_state.extracted_text and st.session_state.client_name:
