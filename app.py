@@ -410,6 +410,7 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                             st.caption(f"**Target Return Form Layout:** {r_loan.itr_form_to_use}")
                         
                         # Generate Unified Binary PDF stream
+                        # Generate Unified Binary PDF stream
                         pdf_data = create_unified_pdf_report(
                             st.session_state.client_name,
                             st.session_state.profile_framework,
@@ -417,13 +418,19 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                         )
                         
                         st.markdown("---")
-                        st.download_button(
-                            label="📥 Download Consolidated Master Blueprint PDF (Both Options + Steps Included)",
-                            data=pdf_data,
-                            file_name=f"KSP_Master_Consolidated_Blueprint_{st.session_state.client_name.replace(' ', '_')}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
+                        
+                        # SAFETY CHECK: Only enable download if the PDF data stream is valid and non-empty
+                        if pdf_data and len(pdf_data) > 0:
+                            st.download_button(
+                                label="📥 Download Consolidated Master Blueprint PDF (Both Options + Steps Included)",
+                                data=pdf_data,
+                                file_name=f"KSP_Master_Consolidated_Blueprint_{st.session_state.client_name.replace(' ', '_')}.pdf",
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
+                        else:
+                            st.error("⚠️ PDF Generation Warning: The data matrix returned was empty. Please verify your API Key constraints or re-run the synthesis.")
+                            
                         st.markdown("---")
                         
                         # Step-by-Step Dropdown Accordions
