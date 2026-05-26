@@ -66,6 +66,13 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf = FPDF()
     pdf.add_page()
     
+    # Secure text helper to strip emojis (\u2b50, etc.) that crash latin-1 PDF writers
+    def clean_txt(text_str):
+        if not text_str:
+            return ""
+        # Encode to latin-1 while ignoring/dropping unencodable characters like emojis
+        return text_str.encode('latin-1', 'ignore').decode('latin-1')
+    
     # Header Banner
     pdf.set_fill_color(10, 37, 64) 
     pdf.rect(0, 0, 210, 40, 'F')
@@ -93,10 +100,10 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.set_xy(15, 65)
     pdf.set_font("Helvetica", style="B", size=11)
     pdf.set_text_color(22, 101, 52)
-    pdf.cell(0, 5, "⭐ TAX COPILOT STRATEGIC FILING RECOMMENDATION", ln=True)
+    pdf.cell(0, 5, "TAX COPILOT STRATEGIC FILING RECOMMENDATION", ln=True)
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(180, 4, output_obj.agent_final_recommendation.encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(180, 4, clean_txt(output_obj.agent_final_recommendation))
     
     # ==========================================
     # ROUTE 1: STANDARD COMPLIANCE
@@ -118,7 +125,7 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.cell(0, 5, "Standard Route Step-by-Step Portal Execution:", ln=True)
     pdf.set_font("Helvetica", size=8.5)
     for idx, step in enumerate(std_r.step_by_step_portal_workflow, 1):
-        pdf.multi_cell(0, 4, f" {idx}. {step}".encode('latin-1', 'ignore').decode('latin-1'))
+        pdf.multi_cell(0, 4, f" {idx}. {clean_txt(step)}")
         
     # ==========================================
     # ROUTE 2: LOAN OPTIMIZATION
@@ -140,7 +147,7 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.cell(0, 5, "Loan Route Step-by-Step Portal Execution:", ln=True)
     pdf.set_font("Helvetica", size=8.5)
     for idx, step in enumerate(loan_r.step_by_step_portal_workflow, 1):
-        pdf.multi_cell(0, 4, f" {idx}. {step}".encode('latin-1', 'ignore').decode('latin-1'))
+        pdf.multi_cell(0, 4, f" {idx}. {clean_txt(step)}")
 
     # ==========================================
     # STATUTORY OVERVIEW & WARNINGS
@@ -149,7 +156,7 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.set_font("Helvetica", style="B", size=12)
     pdf.cell(0, 6, "COMPLIANCE FRAMEWORK & STATUTORY AUDIT NOTES", ln=True)
     pdf.set_font("Helvetica", size=9)
-    pdf.multi_cell(0, 4.5, output_obj.statutory_overview.encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(0, 4.5, clean_txt(output_obj.statutory_overview))
     
     pdf.ln(4)
     pdf.set_font("Helvetica", style="B", size=12)
@@ -158,12 +165,9 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
     for warning in output_obj.critical_compliance_warnings:
-        pdf.multi_cell(0, 4.5, f"[-] {warning}".encode('latin-1', 'ignore').decode('latin-1'))
+        pdf.multi_cell(0, 4.5, f"[-] {clean_txt(warning)}")
         
-    raw_pdf_string = pdf.output(dest='S')
-    if isinstance(raw_pdf_string, str):
-        return raw_pdf_string.encode('latin-1', 'ignore')
-    return raw_pdf_string
+    return pdf.output(dest='S')
 
 # =====================================================================
 # 2. UI DESIGN & WORKSPACE LAYOUT
@@ -451,4 +455,4 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
 elif selected_service == "🏢 Business Incorporation Strategy Matrix":
     st.markdown("<div class='hero-card'><h3>🏢 Business Incorporation Strategy Matrix</h3><p>SaaS module engine placeholder.</p></div>", unsafe_allow_html=True)
 elif selected_service == "📈 Predictive Fractional CFO Modeling":
-    st.markdown("<div class='hero-card'><h3>📈 Predictive Fractional CFO Modeling</h3><p>SaaS module engine placeholder.</p></div>", unsafe_allow_html=True)
+    st.markdown("<div class='hero-card'><h3>📈 Predictive Fractional CFO Modeling</h3><p>SaaS
