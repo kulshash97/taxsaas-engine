@@ -9,3 +9,4 @@ beautifulsoup4
 requests
 reportlab
 PyPDF2
+openpyxl

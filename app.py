@@ -89,14 +89,14 @@ def create_pdf_report(name, profile, route, output_obj):
     pdf.set_font("Helvetica", style="B", size=10)
     pdf.cell(0, 6, f"- Total Presumptive Net Income to Enter: INR {output_obj.total_taxable_presumptive_income:,.2f}", ln=True)
     
-    # Statutory Segment - FIXED: Changed set_ln(5) to ln(5)
+    # Statutory Segment
     pdf.ln(5)
     pdf.set_font("Helvetica", style="B", size=12)
     pdf.cell(0, 8, "STATUTORY OVERVIEW", ln=True)
     pdf.set_font("Helvetica", size=10)
     pdf.multi_cell(0, 5, output_obj.statutory_overview.encode('latin-1', 'ignore').decode('latin-1'))
     
-    # Steps Segment - FIXED: Changed set_ln(5) to ln(5)
+    # Steps Segment
     pdf.ln(5)
     pdf.set_font("Helvetica", style="B", size=12)
     pdf.cell(0, 8, "PORTAL FILING MECHANICS CHECKLIST", ln=True)
@@ -104,7 +104,11 @@ def create_pdf_report(name, profile, route, output_obj):
     for idx, step in enumerate(output_obj.step_by_step_portal_workflow, 1):
         pdf.multi_cell(0, 5, f"Step {idx}: {step}".encode('latin-1', 'ignore').decode('latin-1'))
         
-    return pdf.output()
+    # FIXED: Return pure binary string output format to avoid downstream casting bugs
+    raw_pdf_string = pdf.output(dest='S')
+    if isinstance(raw_pdf_string, str):
+        return raw_pdf_string.encode('latin-1', 'ignore')
+    return raw_pdf_string
 
 # =====================================================================
 # 2. UI DESIGN & WORKSPACE LAYOUT
@@ -339,7 +343,6 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                     {st.session_state.extracted_text}
                     """
                     
-                    # FIXED: Added robust 3x retry mechanism for temporary 503 Server Unavailable spikes
                     max_retries = 3
                     agent_output = None
                     
@@ -361,13 +364,13 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                                 )
                             )
                             agent_output = ConnectedAgentResponse.model_validate_json(response.text)
-                            break # Break loop if successful
+                            break
                         except Exception as api_err:
                             if "503" in str(api_err) and attempt < max_retries - 1:
-                                time.sleep(2) # Backoff for 2 seconds before retrying
+                                time.sleep(2)
                                 continue
                             else:
-                                raise api_err # Escalate if all retries exhausted or different error
+                                raise api_err
                     
                     if agent_output:
                         st.success(f"✅ Blueprint Compiled Under: {selected_route}")
@@ -388,9 +391,10 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                         )
                         
                         st.markdown("---")
+                        # FIXED: Passed pdf_data directly as safe byte output string
                         st.download_button(
                             label="📥 Download This Filing Blueprint PDF",
-                            data=bytes(pdf_data),
+                            data=pdf_data,
                             file_name=f"KSP_Filing_Blueprint_{st.session_state.client_name.replace(' ', '_')}.pdf",
                             mime="application/pdf",
                             use_container_width=True

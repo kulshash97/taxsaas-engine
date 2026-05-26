@@ -1,0 +1,137 @@
+import os
+import streamlit as st
+from google import genai
+from google.genai import types
+from pydantic import BaseModel, Field
+
+# =====================================================================
+# 1. INITIALIZATION & SECURITY ROUTING
+# =====================================================================
+
+if "GEMINI_API_KEY" in os.environ:
+    client = genai.Client()
+elif "GEMINI_API_KEY" in st.secrets:
+    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+else:
+    st.error("Missing Gemini API Key. Please ensure your secrets.toml file is configured correctly inside the hidden .streamlit folder.")
+    st.stop()
+
+class SocialMediaPostSchema(BaseModel):
+    hook_headline: str = Field(description="High-converting, urgent headline designed to make local business owners stop scrolling.")
+    simplified_analogy: str = Field(description="Breaking down the complex section of law using a clear, simple everyday example.")
+    the_financial_danger: str = Field(description="The exact risk or notice exposure if they choose to ignore this rule or leave it unfiled.")
+    the_ksp_solution: str = Field(description="How KSP's diagnostic software handles this problem flawlessly on a 5-minute screen-share call.")
+    instagram_linkedin_caption: str = Field(description="A highly optimized, formatted text script complete with clear line breaks, bullet points, and targeted business hashtags.")
+
+# =====================================================================
+# 2. INTERFACE DISPLAY LAYER
+# =====================================================================
+
+st.set_page_config(page_title="KSP Automated Content Studio", page_icon="📱", layout="wide")
+
+st.markdown("""
+    <style>
+    .main-title { font-size:36px !important; color:#0A2540; font-weight:bold; margin-bottom: 5px; }
+    .sub-title { font-size:15px !important; color:#4A607A; margin-bottom: 25px; }
+    .content-box { background-color: #F7FAFC; padding: 20px; border-radius: 10px; border-left: 6px solid #0A2540; margin-bottom: 20px; }
+    </style>
+""", unsafe_allow_html=True)
+
+st.markdown("<div class='main-title'>📱 KSP AUTOMATED CONTENT STUDIO</div>", unsafe_allow_html=True)
+st.markdown("<div class='sub-title'>High-Velocity Legal Explainer & Organic Lead Generation Engine</div>", unsafe_allow_html=True)
+
+# --- AUTOMATED TOPIC DROPDOWN SELECTION ---
+st.markdown("### 🎯 Select an Automated Viral Topic Trigger")
+
+preset_topics = {
+    "🔥 The UPI Ticking Time Bomb (For Local Retailers & Shopkeepers)": "Income Tax automated AI systems tracking heavy daily UPI and PhonePe transaction velocity on unfiled current or personal accounts, leading to automatic summary notices.",
+    "💻 The 50% Tax Hack (For Software Developers & Creative Freelancers)": "Section 44ADA Presumptive Taxation allowing high-earning independent developers, consultants, and creators to legally write off 50% of their gross earnings as expenses with zero paperwork.",
+    "🛡️ The Hidden Profit Leakage (For GST Registered Businesses)": "Section 17(5) Blocked Input Tax Credits where standard or cheap accountants fail to reconcile GSTR-2B line-by-line against purchase registers, causing businesses to lose lakhs in unclaimed cash.",
+    "🛑 The 'I Will Just Skip Filing This Year' Mistake": "Severe compounding financial penalties, bank account freezing risks, and retroactive scrutiny under the Finance Act for commercial profiles choosing to ignore annual compliance deadlines."
+}
+
+selected_preset = st.selectbox(
+    "Choose a trending local problem to break down instantly:",
+    list(preset_topics.keys())
+)
+
+# Seamlessly passes the selected legal background to the AI model
+target_statute = preset_topics[selected_preset]
+
+# --- TARGET AUDIENCE PICKER ---
+target_audience = st.selectbox(
+    "Select Your Target Viewer Segment Profile:",
+    [
+        "Hyderabad Local Retail Owners, Gyms & Tiffin Center Operators", 
+        "Independent Tech Freelancers, Agency Founders & Consultants", 
+        "Traditional Practitioners & Professionals with heavy UPI logs"
+    ]
+)
+
+# =====================================================================
+# 3. AI EXECUTION & SYNTHESIS
+# =====================================================================
+
+if st.button("Generate High-Impact Strategic Content"):
+    with st.spinner("Deconstructing legal text and engineering viral marketing architecture..."):
+        try:
+            prompt = f"""
+            Break down the following compliance matrix:
+            REGULATORY CONTEXT: {target_statute}
+            TARGET AUDIENCE FILTER: {target_audience}
+            
+            CRITICAL CAPTION REQUIREMENTS:
+            1. Keep the tone sharp, professional, yet punchy—like an elite institutional consultant.
+            2. The 'simplified_analogy' must avoid heavy jargon. Use a highly relatable everyday example.
+            3. The call to action (CTA) must explicitly instruct the viewer to direct message (DM) KSP for a 'Free 5-Minute Google Meet/Zoom Screen-Share Audit' where they can see their transaction data processed through our custom layout live.
+            """
+            
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    system_instruction=(
+                        "You are the Head of Growth and Digital Copywriting Strategy at Kulkarni Strategic Partners (KSP). "
+                        "Your mission is to translate complex Indian tax sections, GST amendments, and corporate laws into highly engaging, "
+                        "crystal-clear educational posts that make small business owners take immediate action. Always position KSP's "
+                        "proprietary automation software workspace as the ultimate tool to protect their capital."
+                    ),
+                    response_mime_type="application/json",
+                    response_schema=SocialMediaPostSchema,
+                    temperature=0.7
+                )
+            )
+            
+            # Parse and validate response structure
+            post = SocialMediaPostSchema.model_validate_json(response.text)
+            
+            st.success("⚡ Strategic Post Elements Compiled Successfully!")
+            
+            # Split display interface
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                st.markdown("<div class='content-box'>", unsafe_allow_html=True)
+                st.markdown(f"#### 🛑 Scroll-Stopping Hook Headline:\n**{post.hook_headline}**")
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+                st.markdown("### 💡 The Simplified Breakdown (No Jargon)")
+                st.info(post.simplified_analogy)
+                
+                st.markdown("### ⚠️ The Hidden Financial Danger")
+                st.error(post.the_financial_danger)
+                
+                st.markdown("### 🛡️ The KSP System Insulation")
+                st.success(post.the_ksp_solution)
+                
+            with col2:
+                st.markdown("### 📝 Ready-to-Copy Instagram / LinkedIn Caption")
+                st.caption("Copy this entire formatted text script directly into your clipboard:")
+                st.text_area(
+                    label="Caption Output Field (Scroll down to see the whole text):", 
+                    value=post.instagram_linkedin_caption, 
+                    height=450
+                )
+                
+        except Exception as e:
+            st.error(f"Execution Error: {e}")
