@@ -55,6 +55,7 @@ if "file_name" not in st.session_state:
     st.session_state.file_name = ""
 
 # Helper function to generate standard clean PDF documents dynamically
+# Helper function to generate standard clean PDF documents dynamically
 def create_pdf_report(name, profile, route, output_obj):
     pdf = FPDF()
     pdf.add_page()
@@ -88,15 +89,15 @@ def create_pdf_report(name, profile, route, output_obj):
     pdf.set_font("Helvetica", style="B", size=10)
     pdf.cell(0, 6, f"- Total Presumptive Net Income to Enter: INR {output_obj.total_taxable_presumptive_income:,.2f}", ln=True)
     
-    # Statutory Segment
-    pdf.set_ln(5)
+    # Statutory Segment - FIXED: Changed set_ln(5) to ln(5)
+    pdf.ln(5)
     pdf.set_font("Helvetica", style="B", size=12)
     pdf.cell(0, 8, "STATUTORY OVERVIEW", ln=True)
     pdf.set_font("Helvetica", size=10)
     pdf.multi_cell(0, 5, output_obj.statutory_overview.encode('latin-1', 'ignore').decode('latin-1'))
     
-    # Steps Segment
-    pdf.set_ln(5)
+    # Steps Segment - FIXED: Changed set_ln(5) to ln(5)
+    pdf.ln(5)
     pdf.set_font("Helvetica", style="B", size=12)
     pdf.cell(0, 8, "PORTAL FILING MECHANICS CHECKLIST", ln=True)
     pdf.set_font("Helvetica", size=10)
