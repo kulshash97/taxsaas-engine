@@ -71,7 +71,7 @@ def clean_pdf_text(text):
         cleaned = cleaned.replace(char, "")
     return cleaned.encode('latin-1', 'ignore').decode('latin-1').strip()
 
-# Helper function to generate unified dynamic PDF report safely
+# Helper function to generate unified dynamic PDF report safely into a clean binary byte stream
 def create_unified_pdf_report(name, profile, output_obj):
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
@@ -168,10 +168,13 @@ def create_unified_pdf_report(name, profile, output_obj):
     for warning in output_obj.critical_compliance_warnings:
         pdf.multi_cell(180, 4.5, f"[-] {clean_pdf_text(warning)}")
         
-    raw_pdf_string = pdf.output(dest='S')
-    if isinstance(raw_pdf_string, str):
-        return raw_pdf_string.encode('latin-1', 'ignore')
-    return raw_pdf_string
+    # Standard, bulletproof output format via memory bytes buffer stream
+    raw_bytes = pdf.output()
+    if isinstance(raw_bytes, str):
+        return raw_bytes.encode('latin-1', 'ignore')
+    elif isinstance(raw_bytes, (bytearray, bytes)):
+        return bytes(raw_bytes)
+    return raw_bytes
 
 # =====================================================================
 # 2. UI DESIGN & WORKSPACE LAYOUT
@@ -324,15 +327,14 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                                 )
                             )
                             agent_output = ConsolidatedAgentResponse.model_validate_json(response.text)
-                            break # Success! Break out of the retry loop.
+                            break 
                         except Exception as api_err:
-                            # If it's a 503 overload, wait and retry
                             if "503" in str(api_err) and attempt < max_retries - 1:
                                 sleep_time = initial_delay * (2 ** attempt)
                                 st.warning(f"⚠️ Model experiencing high demand (503). Retrying engine run in {sleep_time}s... (Attempt {attempt + 1}/{max_retries})")
                                 time.sleep(sleep_time)
                             else:
-                                raise api_err # Propagate if all retries fail or it's a different error
+                                raise api_err 
                     
                     if agent_output:
                         st.success("🏆 Unified Strategy Matrix Successfully Assembled!")
@@ -361,7 +363,7 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                             st.metric("Net Presumptive Profit", f"₹ {r_loan.total_taxable_presumptive_income:,.2f}")
                             st.caption(f"**Target Return Form Layout:** {r_loan.itr_form_to_use}")
                         
-                        # Generate PDF stream safely with robust wrap widths
+                        # Generate PDF safely into raw bytes buffer
                         pdf_data = create_unified_pdf_report(
                             st.session_state.client_name,
                             st.session_state.profile_framework,
