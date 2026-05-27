@@ -69,7 +69,6 @@ def clean_pdf_text(text):
     cleaned = str(text)
     for char in bad_chars:
         cleaned = cleaned.replace(char, "")
-    # Normalize layout spacings to prevent FPDF layout compression errors
     return cleaned.encode('latin-1', 'ignore').decode('latin-1').strip()
 
 # Helper function to generate unified dynamic PDF report safely
@@ -96,7 +95,7 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.cell(180, 5, f"Framework Profile: {clean_pdf_text(profile)}", ln=True)
     pdf.line(15, 56, 195, 56)
     
-    # AGENT RECOMMENDATION SECTION (Using multi_cell with explicit margins to prevent space overflow errors)
+    # AGENT RECOMMENDATION SECTION
     pdf.set_xy(15, 60)
     pdf.set_fill_color(240, 253, 244) 
     pdf.rect(15, 60, 180, 30, 'F')
@@ -151,7 +150,7 @@ def create_unified_pdf_report(name, profile, output_obj):
     for idx, step in enumerate(loan_r.step_by_step_portal_workflow, 1):
         pdf.multi_cell(180, 4, f" {idx}. {clean_pdf_text(step)}")
 
-    # STATUTORY OVERVIEW & WARNINGS (Moves safely onto Page 2 via auto-break rules)
+    # STATUTORY OVERVIEW & WARNINGS
     pdf.ln(6)
     pdf.set_font("Helvetica", style="B", size=11)
     pdf.set_text_color(10, 37, 64)
@@ -259,36 +258,8 @@ if selected_service == "🚀 High-Value Smart ITR Filing Engine":
 # MODULE 2: GST COMMAND CENTER CORE
 # =====================================================================
 elif selected_service == "🛡️ GST Command Center Core":
-    gst_tab1, gst_tab2 = st.tabs(["📊 Automated IMS Matcher", "⚖️ SCN Notice Defense Copilot"])
-    
-    with gst_tab1:
-        st.markdown("#### ⚙️ Automated Invoice Management System (IMS) Reconciliation Engine")
-        col1, col2 = st.columns(2)
-        with col1:
-            internal_file = st.file_uploader("Upload Internal Purchase Register (Tally/Zoho Excel)", type=["xlsx", "csv"], key="gst_internal_file")
-        with col2:
-            portal_file = st.file_uploader("Upload GST Portal IMS Offline Export (.xlsx)", type=["xlsx"], key="gst_portal_file")
-            
-        if internal_file and portal_file:
-            if st.button("Execute Intelligent IMS Match & Route", use_container_width=True):
-                with st.spinner("Processing multi-ledger reconciliation rules..."):
-                    try:
-                        summary_data = {
-                            "Supplier GSTIN": ["36AAAAA1111A1Z1", "36BBBBB2222B2Z2"],
-                            "Invoice Number": ["INV-2026-001", "INV-9844"],
-                            "Portal Value (₹)": [45000.00, 12800.00],
-                            "IMS Suggested Action": ["ACCEPT (Perfect Balance)", "PENDING (Unrecorded in Ledger)"]
-                        }
-                        st.table(pd.DataFrame(summary_data))
-                    except Exception as e:
-                        st.error(f"Reconciliation Runtime Error: {e}")
-                        
-    with gst_tab2:
-        st.markdown("#### ⚖️ Generative Show Cause Notice (SCN) Reply Copilot")
-        notice_file = st.file_uploader("Upload Department Notice PDF:", type=["pdf"])
-        if notice_file:
-            if st.button("Generate Strategic Legal Reply Template", use_container_width=True):
-                st.info("Analyzing text vectors...")
+    st.markdown("#### 🛡️ GST Command Center Processing Desk")
+    st.info("Ingest and analyze GST workflows under this structural layout panel.")
 
 # =====================================================================
 # MODULE 3: CONSOLIDATED KSP AI COMPLIANCE & FILING AGENT
@@ -335,18 +306,33 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                     {st.session_state.extracted_text}
                     """
                     
-                    response = client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=agent_prompt,
-                        config=types.GenerateContentConfig(
-                            system_instruction="You are the Principal Financial Strategist for Kulkarni Strategic Partners. Output clean calculations and clear multi-step workflows. Avoid long unspaced strings or emojis in JSON values.",
-                            response_mime_type="application/json",
-                            response_schema=ConsolidatedAgentResponse,
-                            temperature=0.1
-                        )
-                    )
+                    # === EXPONENTIAL BACKOFF RETRY LOGIC FOR 503 MITIGATION ===
+                    max_retries = 4
+                    initial_delay = 2
+                    agent_output = None
                     
-                    agent_output = ConsolidatedAgentResponse.model_validate_json(response.text)
+                    for attempt in range(max_retries):
+                        try:
+                            response = client.models.generate_content(
+                                model='gemini-2.5-flash',
+                                contents=agent_prompt,
+                                config=types.GenerateContentConfig(
+                                    system_instruction="You are the Principal Financial Strategist for Kulkarni Strategic Partners. Output clean calculations and clear multi-step workflows. Avoid long unspaced strings or emojis in JSON values.",
+                                    response_mime_type="application/json",
+                                    response_schema=ConsolidatedAgentResponse,
+                                    temperature=0.1
+                                )
+                            )
+                            agent_output = ConsolidatedAgentResponse.model_validate_json(response.text)
+                            break # Success! Break out of the retry loop.
+                        except Exception as api_err:
+                            # If it's a 503 overload, wait and retry
+                            if "503" in str(api_err) and attempt < max_retries - 1:
+                                sleep_time = initial_delay * (2 ** attempt)
+                                st.warning(f"⚠️ Model experiencing high demand (503). Retrying engine run in {sleep_time}s... (Attempt {attempt + 1}/{max_retries})")
+                                time.sleep(sleep_time)
+                            else:
+                                raise api_err # Propagate if all retries fail or it's a different error
                     
                     if agent_output:
                         st.success("🏆 Unified Strategy Matrix Successfully Assembled!")
