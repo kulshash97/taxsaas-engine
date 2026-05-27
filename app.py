@@ -71,21 +71,47 @@ with st.sidebar:
     st.caption("Kulkarni Strategic Partners v1.0.0 | Operational Mode")
 
 # -------------------------------------------------------------------
-# WORKSPACE 1: DUAL-ROUTE OPTIMIZATION
+# WORKSPACE 1: DUAL-ROUTE OPTIMIZATION (CLIENT PROFILES RESTORED)
 # -------------------------------------------------------------------
 if app_mode == "1. Dual-Route Optimization":
     st.markdown('<div class="main-header">Dual-Route Tax & Revenue Matrix</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Bain-grade client profile analysis tool</div>', unsafe_allow_html=True)
     
+    # 🌟 RESTORED: Client profile quick-select radio buttons
+    st.markdown("### 👥 **Select Client Profile Profile Sandbox**")
+    client_profile = st.radio(
+        "Choose an active client ledger simulation or select Manual Entry:",
+        ["Manual Entry", "Mani Krishna (Presumptive 44AD Sandbox)", "Vamsi (Retail Ledger Track)"],
+        horizontal=True
+    )
+    
+    # Set default values dynamically based on your selection
+    if client_profile == "Mani Krishna (Presumptive 44AD Sandbox)":
+        default_turnover = 4500000.0   # 45 Lakhs Gross
+        default_profit = 850000.0      # 8.5 Lakhs Declared
+        default_digital = 100          # 100% Digital Banking Transactions
+    elif client_profile == "Vamsi (Retail Ledger Track)":
+        default_turnover = 12500000.0  # 1.25 Crore Gross
+        default_profit = 1500000.0     # 15 Lakhs Declared
+        default_digital = 65           # Mixed cash/digital
+    else:
+        default_turnover = 5000000.0
+        default_profit = 600000.0
+        default_digital = 90
+
+    st.markdown("---")
+    
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("### **Client Financial Parameters**")
-        gross_turnover = st.number_input("Gross Annual Turnover (INR)", min_value=0.0, value=12500000.0, step=50000.0)
-        declared_profit = st.number_input("Declared Net Business Profit (INR)", min_value=0.0, value=1500000.0, step=25000.0)
-        digital_receipts_pct = st.slider("Percentage of Digital/Digital-Banking Receipts (%)", 0, 100, 95)
+        gross_turnover = st.number_input("Gross Annual Turnover (INR)", min_value=0.0, value=default_turnover, step=50000.0)
+        declared_profit = st.number_input("Declared Net Business Profit (INR)", min_value=0.0, value=default_profit, step=25000.0)
+        digital_receipts_pct = st.slider("Percentage of Digital/Digital-Banking Receipts (%)", 0, 100, default_digital)
     
     with col2:
         st.markdown("### **Strategic Optimization Comparison**")
+        
+        # Presumptive taxation logic parameters
         presumptive_rate = 0.06 if digital_receipts_pct >= 95 else 0.08
         simulated_presumptive_income = gross_turnover * presumptive_rate
         
@@ -109,7 +135,7 @@ if app_mode == "1. Dual-Route Optimization":
             st.info("Route A remains optimal for this financial layout profile.")
 
 # -------------------------------------------------------------------
-# WORKSPACE 2: SYSTEM RECONCILIATION AUDIT (STABLE SYNC INTEGRATION)
+# WORKSPACE 2: SYSTEM RECONCILIATION AUDIT
 # -------------------------------------------------------------------
 elif app_mode == "2. System Reconciliation Audit":
     st.markdown('<div class="main-header">Automated System Audit Interface</div>', unsafe_allow_html=True)
@@ -118,7 +144,7 @@ elif app_mode == "2. System Reconciliation Audit":
     st.markdown("### 🤖 **Automated Data Retrieval Control**")
     st.caption("Execute a stable background browser instance inside the main thread to securely pull data for ₹0 cost.")
     
-    target_url = st.text_input("Target Secure Portal Login URL", "https://example-compliance-portal.in/login")
+    target_url = st.text_input("Target Secure Portal Login URL", "https://eportal.incometax.gov.in/iec/foservices/#/login")
     
     c1, c2 = st.columns(2)
     with c1:
@@ -146,6 +172,7 @@ elif app_mode == "2. System Reconciliation Audit":
                     
     st.markdown("---")
     
+    # Match the profiles to our audit streams below
     mock_internal_ledger = {
         "INV-2026-001": {"amount": 50000.0, "tax_credit": 9000.0},
         "INV-2026-002": {"amount": 120000.0, "tax_credit": 21600.0},
@@ -177,7 +204,7 @@ elif app_mode == "3. Corporate Invoicing Engine":
     col1, col2 = st.columns(2)
     with col1:
         st.markdown("### **Invoice Details**")
-        client_name = st.text_input("Corporate Client Name", value="ABC Enterprises Ltd")
+        client_name = st.text_input("Corporate Client Name", value="Mani Krishna & Co")
         service_desc = st.selectbox("Strategic Advisory Category", [
             "Corporate Financial Restructuring Matrix",
             "B2B Data Integration and Compliance Optimization Setup",
