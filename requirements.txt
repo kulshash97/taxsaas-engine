@@ -10,3 +10,6 @@ requests
 reportlab
 PyPDF2
 openpyxl
+streamlit
+playwright
+pandas
