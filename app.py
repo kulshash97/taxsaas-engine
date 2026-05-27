@@ -61,6 +61,17 @@ if "extracted_text" not in st.session_state:
 if "file_name" not in st.session_state:
     st.session_state.file_name = ""
 
+# Helper function to remove emoji/Unicode anomalies before PDF generation
+def clean_pdf_text(text):
+    if not text:
+        return ""
+    # Safe fallback mapping to strip out crashing emojis while maintaining structural layout text
+    bad_chars = ["⭐", "🚀", "🟩", "🟢", "🔵", "🔥", "⚠️", "🏆", "📊", "🛡️", "🤖", "🏢", "📈", "⚙️", "🔒"]
+    cleaned = text
+    for char in bad_chars:
+        cleaned = cleaned.replace(char, "")
+    return cleaned.encode('latin-1', 'ignore').decode('latin-1')
+
 # Helper function to generate unified dynamic PDF report containing both strategies
 def create_unified_pdf_report(name, profile, output_obj):
     pdf = FPDF()
@@ -80,21 +91,21 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", style="B", size=10)
     pdf.set_xy(12, 45)
-    pdf.cell(0, 5, f"Client Name: {name}", ln=True)
-    pdf.cell(0, 5, f"Framework Profile: {profile}", ln=True)
+    pdf.cell(0, 5, f"Client Name: {clean_pdf_text(name)}", ln=True)
+    pdf.cell(0, 5, f"Framework Profile: {clean_pdf_text(profile)}", ln=True)
     pdf.line(12, 58, 198, 58)
     
     # AGENT RECOMMENDATION SECTION
     pdf.set_xy(12, 62)
     pdf.set_fill_color(240, 253, 244) 
-    pdf.rect(12, 62, 186, 22, 'F')
+    pdf.rect(12, 62, 186, 26, 'F')
     pdf.set_xy(15, 65)
     pdf.set_font("Helvetica", style="B", size=11)
     pdf.set_text_color(22, 101, 52)
-    pdf.cell(0, 5, "⭐ TAX COPILOT STRATEGIC FILING RECOMMENDATION", ln=True)
+    pdf.cell(0, 5, "TAX COPILOT STRATEGIC FILING RECOMMENDATION", ln=True)
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(180, 4, output_obj.agent_final_recommendation.encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(180, 4.5, clean_pdf_text(output_obj.agent_final_recommendation))
     
     # ROUTE 1: STANDARD COMPLIANCE
     pdf.ln(8)
@@ -104,7 +115,7 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
     std_r = output_obj.standard_compliance_route
-    pdf.cell(0, 5, f"- Form to Select: {std_r.itr_form_to_use}", ln=True)
+    pdf.cell(0, 5, f"- Form to Select: {clean_pdf_text(std_r.itr_form_to_use)}", ln=True)
     pdf.cell(0, 5, f"- Gross Digital Receipts: INR {std_r.gross_receipts_digital:,.2f} | Gross Cash Receipts: INR {std_r.gross_receipts_cash:,.2f}", ln=True)
     pdf.set_font("Helvetica", style="B", size=9)
     pdf.cell(0, 5, f"- Declared Taxable Presumptive Income: INR {std_r.total_taxable_presumptive_income:,.2f}", ln=True)
@@ -114,7 +125,7 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.cell(0, 5, "Standard Route Step-by-Step Portal Execution:", ln=True)
     pdf.set_font("Helvetica", size=8.5)
     for idx, step in enumerate(std_r.step_by_step_portal_workflow, 1):
-        pdf.multi_cell(0, 4, f" {idx}. {step}".encode('latin-1', 'ignore').decode('latin-1'))
+        pdf.multi_cell(0, 4, f" {idx}. {clean_pdf_text(step)}")
         
     # ROUTE 2: LOAN OPTIMIZATION
     pdf.ln(5)
@@ -124,7 +135,7 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
     loan_r = output_obj.loan_optimization_route
-    pdf.cell(0, 5, f"- Form to Select: {loan_r.itr_form_to_use}", ln=True)
+    pdf.cell(0, 5, f"- Form to Select: {clean_pdf_text(loan_r.itr_form_to_use)}", ln=True)
     pdf.cell(0, 5, f"- Gross Digital Receipts: INR {loan_r.gross_receipts_digital:,.2f} | Gross Cash Receipts: INR {loan_r.gross_receipts_cash:,.2f}", ln=True)
     pdf.set_font("Helvetica", style="B", size=9)
     pdf.cell(0, 5, f"- Declared Taxable Presumptive Income: INR {loan_r.total_taxable_presumptive_income:,.2f}", ln=True)
@@ -134,14 +145,14 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.cell(0, 5, "Loan Route Step-by-Step Portal Execution:", ln=True)
     pdf.set_font("Helvetica", size=8.5)
     for idx, step in enumerate(loan_r.step_by_step_portal_workflow, 1):
-        pdf.multi_cell(0, 4, f" {idx}. {step}".encode('latin-1', 'ignore').decode('latin-1'))
+        pdf.multi_cell(0, 4, f" {idx}. {clean_pdf_text(step)}")
 
     # STATUTORY OVERVIEW & WARNINGS
     pdf.add_page()
     pdf.set_font("Helvetica", style="B", size=12)
     pdf.cell(0, 6, "COMPLIANCE FRAMEWORK & STATUTORY AUDIT NOTES", ln=True)
     pdf.set_font("Helvetica", size=9)
-    pdf.multi_cell(0, 4.5, output_obj.statutory_overview.encode('latin-1', 'ignore').decode('latin-1'))
+    pdf.multi_cell(0, 4.5, clean_pdf_text(output_obj.statutory_overview))
     
     pdf.ln(4)
     pdf.set_font("Helvetica", style="B", size=12)
@@ -150,7 +161,7 @@ def create_unified_pdf_report(name, profile, output_obj):
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
     for warning in output_obj.critical_compliance_warnings:
-        pdf.multi_cell(0, 4.5, f"[-] {warning}".encode('latin-1', 'ignore').decode('latin-1'))
+        pdf.multi_cell(0, 4.5, f"[-] {clean_pdf_text(warning)}")
         
     raw_pdf_string = pdf.output(dest='S')
     if isinstance(raw_pdf_string, str):
@@ -163,7 +174,6 @@ def create_unified_pdf_report(name, profile, output_obj):
 
 st.markdown("""
     <style>
-    /* Force main brand typography to render clearly on dark layouts */
     .main-title { 
         font-size: 32px !important; 
         color: #FFFFFF !important; 
@@ -178,8 +188,6 @@ st.markdown("""
         color: #94A3B8 !important; 
         margin-bottom: 25px !important; 
     }
-    
-    /* Hero callout component */
     .hero-card { 
         background-color: #1E293B !important; 
         padding: 20px !important; 
@@ -192,8 +200,6 @@ st.markdown("""
         margin-top: 0px !important;
         font-size: 19px !important;
     }
-    
-    /* Interactive system elements */
     .pipeline-status { 
         background-color: #0F172A !important; 
         border: 1px solid #38BDF8 !important; 
@@ -215,7 +221,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR CONFIGURATION (CRITICAL: Define variable before module checking) ---
+# --- SIDEBAR CONFIGURATION ---
 st.sidebar.markdown("## 🛠 KSP CONSOLE PLATFORM")
 
 selected_service = st.sidebar.radio(
@@ -240,7 +246,7 @@ st.markdown("<h1 class='main-title'>KULKARNI STRATEGIC PARTNERS</h1>", unsafe_al
 st.markdown("<p class='sub-title'>Enterprise-Grade Financial Optimization & Strategic AI Tax Systems</p>", unsafe_allow_html=True)
 
 # =====================================================================
-# 4. MODULE EXECUTION ROUTING (PROTECTED VIA EXPLICIT ELEMENT KEYS)
+# 4. MODULE EXECUTION ROUTING
 # =====================================================================
 
 if selected_service == "🚀 High-Value Smart ITR Filing Engine":
@@ -251,7 +257,6 @@ if selected_service == "🚀 High-Value Smart ITR Filing Engine":
         </div>
     """, unsafe_allow_html=True)
     
-    # Explicit keys eliminate StreamlitDuplicateElementId completely
     st.session_state.client_name = st.text_input(
         "Target Client Legal Name / Identifier:", 
         value=st.session_state.client_name, 
@@ -416,7 +421,7 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                                     system_instruction=(
                                         "You are the expert Principal Financial Strategist for Kulkarni Strategic Partners. "
                                         "Compute full financial and step-by-step navigation values for both the standard and loan-optimized frameworks concurrently. "
-                                        "Clearly provide a master comparison recommendation inside your response."
+                                        "Do not use unicode emoji symbols in fields meant for text summaries or workflow arrays."
                                     ),
                                     response_mime_type="application/json",
                                     response_schema=ConsolidatedAgentResponse,
@@ -459,6 +464,7 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                             st.metric("Net Presumptive Profit", f"₹ {r_loan.total_taxable_presumptive_income:,.2f}")
                             st.caption(f"**Target Return Form Layout:** {r_loan.itr_form_to_use}")
                         
+                        # Generate PDF stream safely with clean_pdf_text handling
                         pdf_data = create_unified_pdf_report(
                             st.session_state.client_name,
                             st.session_state.profile_framework,
