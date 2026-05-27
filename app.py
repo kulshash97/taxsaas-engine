@@ -137,18 +137,20 @@ elif app_mode == "2. System Reconciliation Audit":
             st.warning("Please enter valid portal credentials to initialize the browser session.")
         else:
             with st.spinner("Launching cloud-optimized synchronous browser instance via Playwright..."):
-                # Call the updated synchronous function directly, bypassing multi-threading blockages
+                # Call the synchronous function call directly
                 extracted_data = fetch_client_portal_data(
                     target_url, portal_user, portal_pass, "#ledger-data-summary"
                 )
                 
-                if extracted_data["status"] == "SUCCESS":
-                    st.success("🎉 Background Data Stream Retrieved Natively for ₹0!")
-                    st.json(extracted_data)
+                # 🛡️ SAFE CHECK: Ensure extracted_data is a dictionary and not None
+                if isinstance(extracted_data, dict) and "status" in extracted_data:
+                    if extracted_data["status"] == "SUCCESS":
+                        st.success("🎉 Background Data Stream Retrieved Natively for ₹0!")
+                        st.json(extracted_data)
+                    else:
+                        st.error(f"Execution Log Flagged: {extracted_data.get('error', 'Unknown extraction error')}")
                 else:
-                    st.error(f"Execution Log Flagged: {extracted_data['error']}")
-                    
-    st.markdown("---")
+                    st.error("❌ The background engine failed to launch or crashed unexpectedly. Check the 'Manage App' logs for browser binary initialization statuses.")
     
     # Structural verification ledger below
     mock_internal_ledger = {
