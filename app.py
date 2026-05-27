@@ -168,9 +168,8 @@ def create_unified_pdf_report(name, profile, output_obj):
 # =====================================================================
 # 2. UI DESIGN & WORKSPACE LAYOUT (OPTIMIZED HEADER FIX)
 # =====================================================================
-
 # =====================================================================
-# 2. UI DESIGN & WORKSPACE LAYOUT (PERFECT DARK THEME CONTRAST FIX)
+# 2. UI DESIGN & WORKSPACE LAYOUT (FIXED SELECTED_SERVICE ROUTING)
 # =====================================================================
 
 st.markdown("""
@@ -178,7 +177,7 @@ st.markdown("""
     /* Force main brand typography to render clearly on dark layouts */
     .main-title { 
         font-size: 32px !important; 
-        color: #FFFFFF !important; /* Pure white for absolute visibility */
+        color: #FFFFFF !important; 
         font-weight: bold !important; 
         margin-top: 0px !important;
         margin-bottom: 4px !important; 
@@ -187,7 +186,7 @@ st.markdown("""
     }
     .sub-title { 
         font-size: 15px !important; 
-        color: #94A3B8 !important; /* Premium slate gray for secondary sub-headers */
+        color: #94A3B8 !important; 
         margin-bottom: 25px !important; 
     }
     
@@ -196,7 +195,7 @@ st.markdown("""
         background-color: #1E293B !important; 
         padding: 20px !important; 
         border-radius: 12px !important; 
-        border-left: 6px solid #38BDF8 !important; /* High-visibility sky blue accent */
+        border-left: 6px solid #38BDF8 !important; 
         margin-bottom: 25px !important; 
     }
     .hero-card h3 {
@@ -226,6 +225,35 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# --- SIDEBAR CONFIGURATION (CRITICAL: Must define variable before evaluation) ---
+st.sidebar.markdown("## 🛠 KSP CONSOLE PLATFORM")
+
+# This creates and assigns the variable instantly on application initialization
+selected_service = st.sidebar.radio(
+    "Choose functional module to execute:",
+    [
+        "🚀 High-Value Smart ITR Filing Engine",
+        "🛡️ GST Command Center Core",
+        "🤖 KSP AI Compliance & Filing Agent",
+        "🏢 Business Incorporation Strategy Matrix",
+        "📈 Predictive Fractional CFO Modeling"
+    ]
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("⚙️ **Architecture Framework:** Unified Matrix Master v3.0")
+st.sidebar.markdown("🔒 **Security Mode:** Active")
+
+
+# =====================================================================
+# 3. MODULE EXECUTION ROUTING
+# =====================================================================
+
+# Now the variable is safely defined and ready for evaluation checks!
+if selected_service == "🚀 High-Value Smart ITR Filing Engine":
+    st.markdown("<h1 class='main-title'>KULKARNI STRATEGIC PARTNERS</h1>", unsafe_allow_html=True)
+    # ... (rest of your Module 1 code continues exactly as it was)
 
 # =====================================================================
 # MODULE 1: SMART ITR FILING ENGINE (DATA EXTRACTION)
