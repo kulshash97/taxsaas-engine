@@ -11,6 +11,9 @@ reportlab
 PyPDF2
 openpyxl
 streamlit
-playwright
 pandas
 chromium
+streamlit
+requests
+beautifulsoup4
+pandas
