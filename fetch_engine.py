@@ -1,6 +1,26 @@
 import asyncio
 from playwright.async_api import async_playwright
-import json
+import os
+import subprocess
+import sys
+
+def ensure_playwright_browsers():
+    """
+    KSP Server Initialization:
+    Checks if the Playwright browser binaries are present on the host container.
+    If missing, programmatically triggers 'playwright install' at ₹0 overhead.
+    """
+    try:
+        # Check if the playwright cache folder exists and has contents
+        cache_dir = os.path.expanduser("~/.cache/ms-playwright")
+        if not os.path.exists(cache_dir) or len(os.listdir(cache_dir)) == 0:
+            print("[KSP SERVER] Playwright binaries missing. Initializing automated cloud install...")
+            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+            print("[KSP SERVER] Playwright binaries deployed successfully.")
+        else:
+            print("[KSP SERVER] Verified Playwright browser cache is active.")
+    except Exception as e:
+        print(f"[KSP SERVER WARNING] Auto-installation check bypassed: {str(e)}")
 
 async def fetch_client_portal_data(login_url, username, password, target_data_selector):
     """
@@ -10,8 +30,10 @@ async def fetch_client_portal_data(login_url, username, password, target_data_se
     """
     print(f"[KSP ENGINE] Initializing background browser data retrieval pipeline...")
     
+    # Force the server to verify browser binaries are installed first
+    ensure_playwright_browsers()
+    
     async with async_playwright() as p:
-        # Launch browser with specific flags to run safely inside Streamlit Cloud's container
         browser = await p.chromium.launch(
             headless=True,
             args=[
@@ -27,21 +49,17 @@ async def fetch_client_portal_data(login_url, username, password, target_data_se
         page = await context.new_page()
         
         try:
-            # Navigate to the specified portal endpoint
             print(f"[KSP ENGINE] Connecting to secure endpoint: {login_url}")
             await page.goto(login_url, wait_until="networkidle", timeout=30000)
             
-            # Execute automated secure authentication sequence
             print("[KSP ENGINE] Executing secure credentials injection...")
             await page.fill("input[type='text']", username)
             await page.fill("input[type='password']", password)
             
-            # Click submit and await server handshake completion
             await page.click("button[type='submit']")
             await page.wait_for_load_state("networkidle", timeout=30000)
             print("[KSP ENGINE] Authentication successful. Session active.")
             
-            # Extract target financial transaction matrix array
             print("[KSP ENGINE] Parsing data matrix streams...")
             raw_element_data = await page.locator(target_data_selector).inner_text(timeout=10000)
             
@@ -57,7 +75,6 @@ async def fetch_client_portal_data(login_url, username, password, target_data_se
             return {"status": "FAILED", "error": str(e)}
             
         finally:
-            # Ensure session is cleanly terminated to avoid memory leaks
             await context.close()
             await browser.close()
             print("[KSP ENGINE] Core retrieval browser context closed safely.")
