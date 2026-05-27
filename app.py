@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
-# Import the stable, synchronous data extraction engine
+# Import the pure synchronous data extraction engine
 from fetch_engine import fetch_client_portal_data
 
 # Set premium, institutional-grade page configuration
@@ -26,10 +26,6 @@ st.markdown("""
 # CORE RECONCILIATION AUDIT ENGINE
 # -------------------------------------------------------------------
 def execute_system_reconciliation_audit(internal_ledger, portal_stream):
-    """
-    KSP Foundational Audit Module: Automatically reconciles internal client records 
-    against live portal data arrays to flag structural variances.
-    """
     audit_log = {
         "status": "PASS",
         "total_variance": 0.0,
@@ -50,7 +46,7 @@ def execute_system_reconciliation_audit(internal_ledger, portal_stream):
             
         elif internal_record['tax_credit'] != portal_record['tax_credit']:
             variance = abs(internal_record['tax_credit'] - portal_record['tax_credit'])
-            if variance > 0.05:  # Tolerance threshold parameter
+            if variance > 0.05:
                 audit_log["status"] = "FAIL"
                 audit_log["flagged_exceptions"].append({
                     "invoice": invoice_id,
@@ -65,7 +61,7 @@ def execute_system_reconciliation_audit(internal_ledger, portal_stream):
 # SIDEBAR NAVIGATION
 # -------------------------------------------------------------------
 with st.sidebar:
-    st.image("https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=200&q=80", use_container_width=True)
+    st.image("https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=200&q=80", width="stretch")
     st.markdown("### **KSP Control Center**")
     app_mode = st.radio(
         "Select Enterprise Workspace:",
@@ -90,8 +86,6 @@ if app_mode == "1. Dual-Route Optimization":
     
     with col2:
         st.markdown("### **Strategic Optimization Comparison**")
-        
-        # Presumptive taxation simulation under Section 44AD
         presumptive_rate = 0.06 if digital_receipts_pct >= 95 else 0.08
         simulated_presumptive_income = gross_turnover * presumptive_rate
         
@@ -137,12 +131,10 @@ elif app_mode == "2. System Reconciliation Audit":
             st.warning("Please enter valid portal credentials to initialize the browser session.")
         else:
             with st.spinner("Launching cloud-optimized synchronous browser instance via Playwright..."):
-                # Call the synchronous function call directly
                 extracted_data = fetch_client_portal_data(
                     target_url, portal_user, portal_pass, "#ledger-data-summary"
                 )
                 
-                # 🛡️ SAFE CHECK: Ensure extracted_data is a dictionary and not None
                 if isinstance(extracted_data, dict) and "status" in extracted_data:
                     if extracted_data["status"] == "SUCCESS":
                         st.success("🎉 Background Data Stream Retrieved Natively for ₹0!")
@@ -150,18 +142,18 @@ elif app_mode == "2. System Reconciliation Audit":
                     else:
                         st.error(f"Execution Log Flagged: {extracted_data.get('error', 'Unknown extraction error')}")
                 else:
-                    st.error("❌ The background engine failed to launch or crashed unexpectedly. Check the 'Manage App' logs for browser binary initialization statuses.")
+                    st.error("❌ The background engine failed to execute cleanly or returned None. Verify login inputs.")
+                    
+    st.markdown("---")
     
-    # Structural verification ledger below
     mock_internal_ledger = {
         "INV-2026-001": {"amount": 50000.0, "tax_credit": 9000.0},
         "INV-2026-002": {"amount": 120000.0, "tax_credit": 21600.0},
         "INV-2026-003": {"amount": 75000.0, "tax_credit": 13500.0}
     }
-    
     mock_portal_stream = {
         "INV-2026-001": {"amount": 50000.0, "tax_credit": 9000.0},
-        "INV-2026-002": {"amount": 120000.0, "tax_credit": 18000.0},  # Engineered mismatch
+        "INV-2026-002": {"amount": 120000.0, "tax_credit": 18000.0},
     }
     
     st.markdown("### **Active Data Streams Flagged for Verification**")
@@ -171,7 +163,7 @@ elif app_mode == "2. System Reconciliation Audit":
         if result["status"] == "FAIL":
             st.error(f"❌ System Audit Flags Tripped! Total Variance Extracted: ₹{result['total_variance']:,.2f}")
             df_exceptions = pd.DataFrame(result["flagged_exceptions"])
-            st.dataframe(df_exceptions, use_container_width=True)
+            st.dataframe(df_exceptions, width="stretch")
         else:
             st.success("✅ All data streams balanced perfectly. Zero variances found across the transaction matrix.")
 
