@@ -166,9 +166,6 @@ def create_unified_pdf_report(name, profile, output_obj):
     return raw_pdf_string
 
 # =====================================================================
-# 2. UI DESIGN & WORKSPACE LAYOUT (OPTIMIZED HEADER FIX)
-# =====================================================================
-# =====================================================================
 # 2. UI DESIGN & WORKSPACE LAYOUT (FIXED SELECTED_SERVICE ROUTING)
 # =====================================================================
 
