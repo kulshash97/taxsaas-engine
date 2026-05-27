@@ -166,17 +166,54 @@ def create_unified_pdf_report(name, profile, output_obj):
     return raw_pdf_string
 
 # =====================================================================
-# 2. UI DESIGN & WORKSPACE LAYOUT
+# 2. UI DESIGN & WORKSPACE LAYOUT (OPTIMIZED HEADER FIX)
 # =====================================================================
 
 st.markdown("""
     <style>
-    .main-title { font-size:38px !important; color:#0A2540; font-weight:bold; margin-bottom: 5px; }
-    .sub-title { font-size:16px !important; color:#4A607A; margin-bottom: 30px; }
-    .hero-card { background-color: #F8FAFC; padding: 25px; border-radius: 12px; border-left: 6px solid #0A2540; margin-bottom: 25px; }
-    .pipeline-status { background-color: #E0F2FE; border: 1px solid #7DD3FC; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-weight: 500; color: #0369A1; }
-    .metric-badge { background-color: #F0FDF4; border: 1px solid #BBF7D0; padding: 15px; border-radius: 8px; text-align: center; color: #166534; }
-    .rec-box { background-color: #F0FDF4; border: 1px solid #BBF7D0; padding: 20px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; }
+    .main-title { 
+        font-size:32px !important; 
+        color:#F8FAFC !important; 
+        font-weight:bold; 
+        margin-top: 0px !important;
+        margin-bottom: 2px !important; 
+        padding-top: 0px !important;
+    }
+    .sub-title { 
+        font-size:15px !important; 
+        color:#94A3B8 !important; 
+        margin-bottom: 25px !important; 
+    }
+    .hero-card { 
+        background-color: #1E293B; 
+        padding: 20px; 
+        border-radius: 12px; 
+        border-left: 6px solid #38BDF8; 
+        margin-bottom: 25px; 
+        color: #FFFFFF;
+    }
+    .hero-card h3 {
+        color: #FFFFFF !important;
+        margin-top: 0px !important;
+    }
+    .pipeline-status { 
+        background-color: #0F172A; 
+        border: 1px solid #38BDF8; 
+        padding: 12px; 
+        border-radius: 8px; 
+        margin-bottom: 20px; 
+        font-weight: 500; 
+        color: #38BDF8; 
+    }
+    .rec-box { 
+        background-color: #064E3B; 
+        border: 1px solid #059669; 
+        padding: 20px; 
+        border-radius: 8px; 
+        margin-top: 15px; 
+        margin-bottom: 15px;
+        color: #ECFDF5;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -201,9 +238,15 @@ st.sidebar.markdown("🔒 **Security Mode:** Active")
 # MODULE 1: SMART ITR FILING ENGINE (DATA EXTRACTION)
 # =====================================================================
 if selected_service == "🚀 High-Value Smart ITR Filing Engine":
-    st.markdown("<div class='main-title'>💼 KULKARNI STRATEGIC PARTNERS</div>", unsafe_allow_html=True)
-    st.markdown("<div class='sub-title'>Enterprise-Grade Financial Optimization & Strategic AI Tax Systems</div>", unsafe_allow_html=True)
-    st.markdown("<div class='hero-card'><h3>🚀 High-Value Smart ITR Filing Engine</h3><p>Ingests bank ledgers and processes calculations instantly into compliance profiles.</p></div>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-title'>KULKARNI STRATEGIC PARTNERS</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>Enterprise-Grade Financial Optimization & Strategic AI Tax Systems</p>", unsafe_allow_html=True)
+    
+    st.markdown("""
+        <div class='hero-card'>
+            <h3>🚀 High-Value Smart ITR Filing Engine</h3>
+            <p style='color: #94A3B8; margin-bottom:0;'>Ingests bank ledgers and processes calculations instantly into compliance profiles.</p>
+        </div>
+    """, unsafe_allow_html=True)
     
     st.session_state.client_name = st.text_input("Target Client Legal Name / Identifier:", value=st.session_state.client_name, placeholder="Example: Sri Radhakrishna")
     st.session_state.profile_framework = st.selectbox(
@@ -242,8 +285,8 @@ if selected_service == "🚀 High-Value Smart ITR Filing Engine":
 # MODULE 2: GST COMMAND CENTER CORE
 # =====================================================================
 elif selected_service == "🛡️ GST Command Center Core":
-    st.markdown("<div class='main-title'>💼 KULKARNI STRATEGIC PARTNERS</div>", unsafe_allow_html=True)
-    st.markdown("<div class='sub-title'>Automated Invoice Management System (IMS) & Show Cause Notice Copilot</div>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-title'>KULKARNI STRATEGIC PARTNERS</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>Automated Invoice Management System (IMS) & Show Cause Notice Copilot</p>", unsafe_allow_html=True)
     
     gst_tab1, gst_tab2 = st.tabs(["📊 Automated IMS Matcher", "⚖️ SCN Notice Defense Copilot"])
     
@@ -309,9 +352,15 @@ elif selected_service == "🛡️ GST Command Center Core":
 # MODULE 3: CONSOLIDATED KSP AI COMPLIANCE & FILING AGENT
 # =====================================================================
 elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
-    st.markdown("<div class='main-title'>💼 KULKARNI STRATEGIC PARTNERS</div>", unsafe_allow_html=True)
-    st.markdown("<div class='sub-title'>Enterprise-Grade Financial Optimization & Strategic AI Tax Systems</div>", unsafe_allow_html=True)
-    st.markdown("<div class='hero-card'><h3>🤖 Consolidated Master Compliance Agent</h3><p>Compiles, calculates, and reviews both Standard and Loan-Optimized strategies simultaneously into a unified blueprint.</p></div>", unsafe_allow_html=True)
+    st.markdown("<h1 class='main-title'>KULKARNI STRATEGIC PARTNERS</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='sub-title'>Enterprise-Grade Financial Optimization & Strategic AI Tax Systems</p>", unsafe_allow_html=True)
+    
+    st.markdown("""
+        <div class='hero-card'>
+            <h3>🤖 Consolidated Master Compliance Agent</h3>
+            <p style='color: #94A3B8; margin-bottom:0;'>Compiles, calculates, and reviews both Standard and Loan-Optimized strategies simultaneously into a unified blueprint.</p>
+        </div>
+    """, unsafe_allow_html=True)
     
     if st.session_state.extracted_text and st.session_state.client_name:
         st.markdown(f"""
@@ -381,8 +430,8 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                         # Display Recommendation Banner Layout
                         st.markdown(f"""
                             <div class='rec-box'>
-                                <h4 style='color: #166534; margin-top:0;'>⭐ TAX COPILOT DECISION ENGINE RECOMMENDATION:</h4>
-                                <p style='color: #1f2937; font-size:15px;'>{agent_output.agent_final_recommendation}</p>
+                                <h4 style='color: #34D399; margin-top:0;'>⭐ TAX COPILOT DECISION ENGINE RECOMMENDATION:</h4>
+                                <p style='color: #E2E8F0; font-size:15px; margin-bottom:0;'>{agent_output.agent_final_recommendation}</p>
                             </div>
                         """, unsafe_allow_html=True)
                         
@@ -447,6 +496,16 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
 
 # Placeholders for Remaining Background Skeletons
 elif selected_service == "🏢 Business Incorporation Strategy Matrix":
-    st.markdown("<div class='hero-card'><h3>🏢 Business Incorporation Strategy Matrix</h3><p>SaaS module engine placeholder.</p></div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class='hero-card'>
+            <h3>🏢 Business Incorporation Strategy Matrix</h3>
+            <p style='color: #94A3B8; margin-bottom:0;'>SaaS module engine placeholder.</p>
+        </div>
+    """, unsafe_allow_html=True)
 elif selected_service == "📈 Predictive Fractional CFO Modeling":
-    st.markdown("<div class='hero-card'><h3>📈 Predictive Fractional CFO Modeling</h3><p>SaaS module engine placeholder.</p></div>", unsafe_allow_html=True)
+    st.markdown("""
+        <div class='hero-card'>
+            <h3>📈 Predictive Fractional CFO Modeling</h3>
+            <p style='color: #94A3B8; margin-bottom:0;'>SaaS module engine placeholder.</p>
+        </div>
+    """, unsafe_allow_html=True)
