@@ -169,70 +169,63 @@ def create_unified_pdf_report(name, profile, output_obj):
 # 2. UI DESIGN & WORKSPACE LAYOUT (OPTIMIZED HEADER FIX)
 # =====================================================================
 
+# =====================================================================
+# 2. UI DESIGN & WORKSPACE LAYOUT (PERFECT DARK THEME CONTRAST FIX)
+# =====================================================================
+
 st.markdown("""
     <style>
+    /* Force main brand typography to render clearly on dark layouts */
     .main-title { 
-        font-size:32px !important; 
-        color:#F8FAFC !important; 
-        font-weight:bold; 
+        font-size: 32px !important; 
+        color: #FFFFFF !important; /* Pure white for absolute visibility */
+        font-weight: bold !important; 
         margin-top: 0px !important;
-        margin-bottom: 2px !important; 
+        margin-bottom: 4px !important; 
         padding-top: 0px !important;
+        letter-spacing: 0.5px;
     }
     .sub-title { 
-        font-size:15px !important; 
-        color:#94A3B8 !important; 
+        font-size: 15px !important; 
+        color: #94A3B8 !important; /* Premium slate gray for secondary sub-headers */
         margin-bottom: 25px !important; 
     }
+    
+    /* Hero callout component */
     .hero-card { 
-        background-color: #1E293B; 
-        padding: 20px; 
-        border-radius: 12px; 
-        border-left: 6px solid #38BDF8; 
-        margin-bottom: 25px; 
-        color: #FFFFFF;
+        background-color: #1E293B !important; 
+        padding: 20px !important; 
+        border-radius: 12px !important; 
+        border-left: 6px solid #38BDF8 !important; /* High-visibility sky blue accent */
+        margin-bottom: 25px !important; 
     }
     .hero-card h3 {
         color: #FFFFFF !important;
         margin-top: 0px !important;
+        font-size: 19px !important;
     }
+    
+    /* Interactive system elements */
     .pipeline-status { 
-        background-color: #0F172A; 
-        border: 1px solid #38BDF8; 
-        padding: 12px; 
-        border-radius: 8px; 
-        margin-bottom: 20px; 
-        font-weight: 500; 
-        color: #38BDF8; 
+        background-color: #0F172A !important; 
+        border: 1px solid #38BDF8 !important; 
+        padding: 12px !important; 
+        border-radius: 8px !important; 
+        margin-bottom: 20px !important; 
+        font-weight: 500 !important; 
+        color: #38BDF8 !important; 
     }
     .rec-box { 
-        background-color: #064E3B; 
-        border: 1px solid #059669; 
-        padding: 20px; 
-        border-radius: 8px; 
-        margin-top: 15px; 
-        margin-bottom: 15px;
-        color: #ECFDF5;
+        background-color: #064E3B !important; 
+        border: 1px solid #059669 !important; 
+        padding: 20px !important; 
+        border-radius: 8px !important; 
+        margin-top: 15px !important; 
+        margin-bottom: 15px !important;
+        color: #ECFDF5 !important;
     }
     </style>
 """, unsafe_allow_html=True)
-
-st.sidebar.markdown("## 🛠 KSP CONSOLE PLATFORM")
-
-selected_service = st.sidebar.radio(
-    "Choose functional module to execute:",
-    [
-        "🚀 High-Value Smart ITR Filing Engine",
-        "🛡️ GST Command Center Core",
-        "🤖 KSP AI Compliance & Filing Agent",
-        "🏢 Business Incorporation Strategy Matrix",
-        "📈 Predictive Fractional CFO Modeling"
-    ]
-)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("⚙️ **Architecture Framework:** Unified Matrix Master v3.0")
-st.sidebar.markdown("🔒 **Security Mode:** Active")
 
 # =====================================================================
 # MODULE 1: SMART ITR FILING ENGINE (DATA EXTRACTION)
