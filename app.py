@@ -168,6 +168,9 @@ def create_unified_pdf_report(name, profile, output_obj):
 # =====================================================================
 # 2. UI DESIGN & WORKSPACE LAYOUT (FIXED SELECTED_SERVICE ROUTING)
 # =====================================================================
+# =====================================================================
+# 2. UI DESIGN & WORKSPACE LAYOUT (CLEAN SINGLE-RENDER HEADERS)
+# =====================================================================
 
 st.markdown("""
     <style>
@@ -223,10 +226,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR CONFIGURATION (CRITICAL: Must define variable before evaluation) ---
+# --- SIDEBAR CONFIGURATION ---
 st.sidebar.markdown("## 🛠 KSP CONSOLE PLATFORM")
 
-# This creates and assigns the variable instantly on application initialization
 selected_service = st.sidebar.radio(
     "Choose functional module to execute:",
     [
@@ -242,6 +244,37 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("⚙️ **Architecture Framework:** Unified Matrix Master v3.0")
 st.sidebar.markdown("🔒 **Security Mode:** Active")
 
+
+# =====================================================================
+# 3. GLOBAL MASTER HEADERS (RENDERS EXACTLY ONCE ABOVE MAIN WRAPPERS)
+# =====================================================================
+st.markdown("<h1 class='main-title'>KULKARNI STRATEGIC PARTNERS</h1>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>Enterprise-Grade Financial Optimization & Strategic AI Tax Systems</p>", unsafe_allow_html=True)
+
+
+# =====================================================================
+# 4. MODULE EXECUTION ROUTING
+# =====================================================================
+
+if selected_service == "🚀 High-Value Smart ITR Filing Engine":
+    # REMOVED DUPLICATE HEADER CALL FROM THIS POINT INSIDE THE CONDITIONAL BLOCK
+    st.markdown("""
+        <div class='hero-card'>
+            <h3>🚀 High-Value Smart ITR Filing Engine</h3>
+            <p style='color: #94A3B8; margin-bottom:0;'>Ingests bank ledgers and processes calculations instantly into compliance profiles.</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    st.session_state.client_name = st.text_input("Target Client Legal Name / Identifier:", value=st.session_state.client_name, placeholder="Example: Sri Radhakrishna")
+    st.session_state.profile_framework = st.selectbox(
+        "Select Client Professional Profile Framework:", 
+        ["Traditional Professional / Priest (Dakshina & Pooja Inflows)", "Independent Tech Freelancer / Agency Founder", "SME Manufacturing Entity"],
+        index=["Traditional Professional / Priest (Dakshina & Pooja Inflows)", "Independent Tech Freelancer / Agency Founder", "SME Manufacturing Entity"].index(st.session_state.profile_framework)
+    )
+    
+    uploaded_file = st.file_uploader("Upload Bank Statement or Transaction Ledger (.pdf, .xlsx, .csv):", type=["pdf", "xlsx", "csv"])
+    
+    # ... (Rest of your script logic for other modules continues below identically)
 
 # =====================================================================
 # 3. MODULE EXECUTION ROUTING
