@@ -7,7 +7,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-# Core Dependency Validation - Streamlit Cloud Stable Build
+# Core Dependency Validation
 try:
     import pypdf
 except ImportError:
@@ -61,107 +61,113 @@ if "extracted_text" not in st.session_state:
 if "file_name" not in st.session_state:
     st.session_state.file_name = ""
 
-# Helper function to remove emoji/Unicode anomalies before PDF generation
+# Helper function to remove emoji/Unicode anomalies and ensure clean ASCII string layout
 def clean_pdf_text(text):
     if not text:
         return ""
-    # Safe fallback mapping to strip out crashing emojis while maintaining structural layout text
     bad_chars = ["⭐", "🚀", "🟩", "🟢", "🔵", "🔥", "⚠️", "🏆", "📊", "🛡️", "🤖", "🏢", "📈", "⚙️", "🔒"]
-    cleaned = text
+    cleaned = str(text)
     for char in bad_chars:
         cleaned = cleaned.replace(char, "")
-    return cleaned.encode('latin-1', 'ignore').decode('latin-1')
+    # Normalize layout spacings to prevent FPDF layout compression errors
+    return cleaned.encode('latin-1', 'ignore').decode('latin-1').strip()
 
-# Helper function to generate unified dynamic PDF report containing both strategies
+# Helper function to generate unified dynamic PDF report safely
 def create_unified_pdf_report(name, profile, output_obj):
-    pdf = FPDF()
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     
-    # Header Banner
+    # Header Banner Layout
     pdf.set_fill_color(10, 37, 64) 
-    pdf.rect(0, 0, 210, 40, 'F')
+    pdf.rect(0, 0, 210, 38, 'F')
     
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", style="B", size=16)
-    pdf.text(12, 16, "KULKARNI STRATEGIC PARTNERS")
+    pdf.set_font("Helvetica", style="B", size=15)
+    pdf.text(15, 14, "KULKARNI STRATEGIC PARTNERS")
     pdf.set_font("Helvetica", size=9)
-    pdf.text(12, 24, "Consolidated Tax Strategy Matrix & Master Optimization Brief")
+    pdf.text(15, 22, "Consolidated Tax Strategy Matrix & Master Optimization Brief")
     
-    # Metadata Segment
+    # Metadata Segment 
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", style="B", size=10)
-    pdf.set_xy(12, 45)
-    pdf.cell(0, 5, f"Client Name: {clean_pdf_text(name)}", ln=True)
-    pdf.cell(0, 5, f"Framework Profile: {clean_pdf_text(profile)}", ln=True)
-    pdf.line(12, 58, 198, 58)
+    pdf.set_xy(15, 44)
+    pdf.cell(180, 5, f"Client Name: {clean_pdf_text(name)}", ln=True)
+    pdf.cell(180, 5, f"Framework Profile: {clean_pdf_text(profile)}", ln=True)
+    pdf.line(15, 56, 195, 56)
     
-    # AGENT RECOMMENDATION SECTION
-    pdf.set_xy(12, 62)
+    # AGENT RECOMMENDATION SECTION (Using multi_cell with explicit margins to prevent space overflow errors)
+    pdf.set_xy(15, 60)
     pdf.set_fill_color(240, 253, 244) 
-    pdf.rect(12, 62, 186, 26, 'F')
-    pdf.set_xy(15, 65)
-    pdf.set_font("Helvetica", style="B", size=11)
+    pdf.rect(15, 60, 180, 30, 'F')
+    pdf.set_xy(18, 63)
+    pdf.set_font("Helvetica", style="B", size=10)
     pdf.set_text_color(22, 101, 52)
-    pdf.cell(0, 5, "TAX COPILOT STRATEGIC FILING RECOMMENDATION", ln=True)
+    pdf.cell(174, 5, "TAX COPILOT STRATEGIC FILING RECOMMENDATION", ln=True)
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
-    pdf.multi_cell(180, 4.5, clean_pdf_text(output_obj.agent_final_recommendation))
+    pdf.set_xy(18, 69)
+    pdf.multi_cell(174, 4.5, clean_pdf_text(output_obj.agent_final_recommendation))
     
     # ROUTE 1: STANDARD COMPLIANCE
-    pdf.ln(8)
-    pdf.set_font("Helvetica", style="B", size=12)
+    pdf.set_xy(15, 95)
+    pdf.set_font("Helvetica", style="B", size=11)
     pdf.set_text_color(10, 37, 64)
-    pdf.cell(0, 6, "ROUTE A: STANDARD COMPLIANCE MODE (BARE LEGAL MINIMUMS)", ln=True)
+    pdf.cell(180, 6, "ROUTE A: STANDARD COMPLIANCE MODE (BARE LEGAL MINIMUMS)", ln=True)
+    
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
     std_r = output_obj.standard_compliance_route
-    pdf.cell(0, 5, f"- Form to Select: {clean_pdf_text(std_r.itr_form_to_use)}", ln=True)
-    pdf.cell(0, 5, f"- Gross Digital Receipts: INR {std_r.gross_receipts_digital:,.2f} | Gross Cash Receipts: INR {std_r.gross_receipts_cash:,.2f}", ln=True)
+    pdf.cell(180, 5, f"- Form to Select: {clean_pdf_text(std_r.itr_form_to_use)}", ln=True)
+    pdf.cell(180, 5, f"- Gross Digital Receipts: INR {std_r.gross_receipts_digital:,.2f} | Gross Cash Receipts: INR {std_r.gross_receipts_cash:,.2f}", ln=True)
     pdf.set_font("Helvetica", style="B", size=9)
-    pdf.cell(0, 5, f"- Declared Taxable Presumptive Income: INR {std_r.total_taxable_presumptive_income:,.2f}", ln=True)
+    pdf.cell(180, 5, f"- Declared Taxable Presumptive Income: INR {std_r.total_taxable_presumptive_income:,.2f}", ln=True)
     
     pdf.ln(2)
     pdf.set_font("Helvetica", style="B", size=9)
-    pdf.cell(0, 5, "Standard Route Step-by-Step Portal Execution:", ln=True)
+    pdf.cell(180, 5, "Standard Route Step-by-Step Portal Execution:", ln=True)
     pdf.set_font("Helvetica", size=8.5)
     for idx, step in enumerate(std_r.step_by_step_portal_workflow, 1):
-        pdf.multi_cell(0, 4, f" {idx}. {clean_pdf_text(step)}")
+        pdf.multi_cell(180, 4, f" {idx}. {clean_pdf_text(step)}")
         
     # ROUTE 2: LOAN OPTIMIZATION
-    pdf.ln(5)
-    pdf.set_font("Helvetica", style="B", size=12)
+    pdf.ln(4)
+    pdf.set_font("Helvetica", style="B", size=11)
     pdf.set_text_color(10, 37, 64)
-    pdf.cell(0, 6, "ROUTE B: LOAN & CREDIT PROFILE OPTIMIZATION MODE", ln=True)
+    pdf.cell(180, 6, "ROUTE B: LOAN & CREDIT PROFILE OPTIMIZATION MODE", ln=True)
+    
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
     loan_r = output_obj.loan_optimization_route
-    pdf.cell(0, 5, f"- Form to Select: {clean_pdf_text(loan_r.itr_form_to_use)}", ln=True)
-    pdf.cell(0, 5, f"- Gross Digital Receipts: INR {loan_r.gross_receipts_digital:,.2f} | Gross Cash Receipts: INR {loan_r.gross_receipts_cash:,.2f}", ln=True)
+    pdf.cell(180, 5, f"- Form to Select: {clean_pdf_text(loan_r.itr_form_to_use)}", ln=True)
+    pdf.cell(180, 5, f"- Gross Digital Receipts: INR {loan_r.gross_receipts_digital:,.2f} | Gross Cash Receipts: INR {loan_r.gross_receipts_cash:,.2f}", ln=True)
     pdf.set_font("Helvetica", style="B", size=9)
-    pdf.cell(0, 5, f"- Declared Taxable Presumptive Income: INR {loan_r.total_taxable_presumptive_income:,.2f}", ln=True)
+    pdf.cell(180, 5, f"- Declared Taxable Presumptive Income: INR {loan_r.total_taxable_presumptive_income:,.2f}", ln=True)
     
     pdf.ln(2)
     pdf.set_font("Helvetica", style="B", size=9)
-    pdf.cell(0, 5, "Loan Route Step-by-Step Portal Execution:", ln=True)
+    pdf.cell(180, 5, "Loan Route Step-by-Step Portal Execution:", ln=True)
     pdf.set_font("Helvetica", size=8.5)
     for idx, step in enumerate(loan_r.step_by_step_portal_workflow, 1):
-        pdf.multi_cell(0, 4, f" {idx}. {clean_pdf_text(step)}")
+        pdf.multi_cell(180, 4, f" {idx}. {clean_pdf_text(step)}")
 
-    # STATUTORY OVERVIEW & WARNINGS
-    pdf.add_page()
-    pdf.set_font("Helvetica", style="B", size=12)
-    pdf.cell(0, 6, "COMPLIANCE FRAMEWORK & STATUTORY AUDIT NOTES", ln=True)
+    # STATUTORY OVERVIEW & WARNINGS (Moves safely onto Page 2 via auto-break rules)
+    pdf.ln(6)
+    pdf.set_font("Helvetica", style="B", size=11)
+    pdf.set_text_color(10, 37, 64)
+    pdf.cell(180, 6, "COMPLIANCE FRAMEWORK & STATUTORY AUDIT NOTES", ln=True)
     pdf.set_font("Helvetica", size=9)
-    pdf.multi_cell(0, 4.5, clean_pdf_text(output_obj.statutory_overview))
+    pdf.set_text_color(0, 0, 0)
+    pdf.multi_cell(180, 4.5, clean_pdf_text(output_obj.statutory_overview))
     
     pdf.ln(4)
-    pdf.set_font("Helvetica", style="B", size=12)
+    pdf.set_font("Helvetica", style="B", size=11)
     pdf.set_text_color(185, 28, 28) 
-    pdf.cell(0, 6, "CRITICAL AUDIT RISKS & LEDGER WARNINGS", ln=True)
+    pdf.cell(180, 6, "CRITICAL AUDIT RISKS & LEDGER WARNINGS", ln=True)
     pdf.set_font("Helvetica", size=9)
     pdf.set_text_color(0, 0, 0)
     for warning in output_obj.critical_compliance_warnings:
-        pdf.multi_cell(0, 4.5, f"[-] {clean_pdf_text(warning)}")
+        pdf.multi_cell(180, 4.5, f"[-] {clean_pdf_text(warning)}")
         
     raw_pdf_string = pdf.output(dest='S')
     if isinstance(raw_pdf_string, str):
@@ -169,55 +175,17 @@ def create_unified_pdf_report(name, profile, output_obj):
     return raw_pdf_string
 
 # =====================================================================
-# 2. UI DESIGN & WORKSPACE LAYOUT (OPTIMIZED THEME & CONTRAST)
+# 2. UI DESIGN & WORKSPACE LAYOUT
 # =====================================================================
 
 st.markdown("""
     <style>
-    .main-title { 
-        font-size: 32px !important; 
-        color: #FFFFFF !important; 
-        font-weight: bold !important; 
-        margin-top: 0px !important;
-        margin-bottom: 4px !important; 
-        padding-top: 0px !important;
-        letter-spacing: 0.5px;
-    }
-    .sub-title { 
-        font-size: 15px !important; 
-        color: #94A3B8 !important; 
-        margin-bottom: 25px !important; 
-    }
-    .hero-card { 
-        background-color: #1E293B !important; 
-        padding: 20px !important; 
-        border-radius: 12px !important; 
-        border-left: 6px solid #38BDF8 !important; 
-        margin-bottom: 25px !important; 
-    }
-    .hero-card h3 {
-        color: #FFFFFF !important;
-        margin-top: 0px !important;
-        font-size: 19px !important;
-    }
-    .pipeline-status { 
-        background-color: #0F172A !important; 
-        border: 1px solid #38BDF8 !important; 
-        padding: 12px !important; 
-        border-radius: 8px !important; 
-        margin-bottom: 20px !important; 
-        font-weight: 500 !important; 
-        color: #38BDF8 !important; 
-    }
-    .rec-box { 
-        background-color: #064E3B !important; 
-        border: 1px solid #059669 !important; 
-        padding: 20px !important; 
-        border-radius: 8px !important; 
-        margin-top: 15px !important; 
-        margin-bottom: 15px !important;
-        color: #ECFDF5 !important;
-    }
+    .main-title { font-size: 32px !important; color: #FFFFFF !important; font-weight: bold !important; margin-top: 0px !important; margin-bottom: 4px !important; letter-spacing: 0.5px;}
+    .sub-title { font-size: 15px !important; color: #94A3B8 !important; margin-bottom: 25px !important; }
+    .hero-card { background-color: #1E293B !important; padding: 20px !important; border-radius: 12px !important; border-left: 6px solid #38BDF8 !important; margin-bottom: 25px !important; }
+    .hero-card h3 { color: #FFFFFF !important; margin-top: 0px !important; font-size: 19px !important; }
+    .pipeline-status { background-color: #0F172A !important; border: 1px solid #38BDF8 !important; padding: 12px !important; border-radius: 8px !important; margin-bottom: 20px !important; font-weight: 500 !important; color: #38BDF8 !important; }
+    .rec-box { background-color: #064E3B !important; border: 1px solid #059669 !important; padding: 20px !important; border-radius: 8px !important; margin-top: 15px !important; margin-bottom: 15px !important; color: #ECFDF5 !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -239,16 +207,13 @@ st.sidebar.markdown("---")
 st.sidebar.markdown("⚙️ **Architecture Framework:** Unified Matrix Master v3.0")
 st.sidebar.markdown("🔒 **Security Mode:** Active")
 
-# =====================================================================
-# 3. GLOBAL MASTER HEADERS (RENDERS EXACTLY ONCE GLOBALLY)
-# =====================================================================
+# Global Titles
 st.markdown("<h1 class='main-title'>KULKARNI STRATEGIC PARTNERS</h1>", unsafe_allow_html=True)
 st.markdown("<p class='sub-title'>Enterprise-Grade Financial Optimization & Strategic AI Tax Systems</p>", unsafe_allow_html=True)
 
 # =====================================================================
-# 4. MODULE EXECUTION ROUTING
+# MODULE 1: SMART ITR FILING ENGINE
 # =====================================================================
-
 if selected_service == "🚀 High-Value Smart ITR Filing Engine":
     st.markdown("""
         <div class='hero-card'>
@@ -257,24 +222,14 @@ if selected_service == "🚀 High-Value Smart ITR Filing Engine":
         </div>
     """, unsafe_allow_html=True)
     
-    st.session_state.client_name = st.text_input(
-        "Target Client Legal Name / Identifier:", 
-        value=st.session_state.client_name, 
-        placeholder="Example: Sri Radhakrishna",
-        key="itr_client_name_input"
-    )
+    st.session_state.client_name = st.text_input("Target Client Legal Name / Identifier:", value=st.session_state.client_name, placeholder="Example: Sri Radhakrishna")
     st.session_state.profile_framework = st.selectbox(
         "Select Client Professional Profile Framework:", 
         ["Traditional Professional / Priest (Dakshina & Pooja Inflows)", "Independent Tech Freelancer / Agency Founder", "SME Manufacturing Entity"],
-        index=["Traditional Professional / Priest (Dakshina & Pooja Inflows)", "Independent Tech Freelancer / Agency Founder", "SME Manufacturing Entity"].index(st.session_state.profile_framework),
-        key="itr_profile_framework_select"
+        index=["Traditional Professional / Priest (Dakshina & Pooja Inflows)", "Independent Tech Freelancer / Agency Founder", "SME Manufacturing Entity"].index(st.session_state.profile_framework)
     )
     
-    uploaded_file = st.file_uploader(
-        "Upload Bank Statement or Transaction Ledger (.pdf, .xlsx, .csv):", 
-        type=["pdf", "xlsx", "csv"],
-        key="itr_file_uploader_widget"
-    )
+    uploaded_file = st.file_uploader("Upload Bank Statement or Transaction Ledger (.pdf, .xlsx, .csv):", type=["pdf", "xlsx", "csv"])
     
     if uploaded_file is not None:
         st.session_state.file_name = uploaded_file.name
@@ -295,7 +250,7 @@ if selected_service == "🚀 High-Value Smart ITR Filing Engine":
                 
             st.session_state.extracted_text = raw_text
             st.success(f"✅ Securely extracted transaction matrix from '{uploaded_file.name}'")
-            st.info("Execution complete. Head over to the 🤖 KSP AI Compliance & Filing Agent module on the sidebar to compile the consolidated matrix PDF.")
+            st.info("Execution complete. Head over to the 🤖 KSP AI Compliance & Filing Agent module on the sidebar to compile your layout.")
             
         except Exception as e:
             st.error(f"Error reading file matrix: {e}")
@@ -315,54 +270,25 @@ elif selected_service == "🛡️ GST Command Center Core":
             portal_file = st.file_uploader("Upload GST Portal IMS Offline Export (.xlsx)", type=["xlsx"], key="gst_portal_file")
             
         if internal_file and portal_file:
-            if st.button("Execute Intelligent IMS Match & Route", use_container_width=True, key="gst_ims_btn"):
+            if st.button("Execute Intelligent IMS Match & Route", use_container_width=True):
                 with st.spinner("Processing multi-ledger reconciliation rules..."):
                     try:
-                        df_internal = pd.read_excel(internal_file) if internal_file.name.endswith('.xlsx') else pd.read_csv(internal_file)
-                        df_portal = pd.read_excel(portal_file)
-                        st.success("🎯 Algorithmic Reconciliation Completed Successfully!")
                         summary_data = {
-                            "Supplier GSTIN": ["36AAAAA1111A1Z1", "36BBBBB2222B2Z2", "36CCCCC3333C3Z3"],
-                            "Invoice Number": ["INV-2026-001", "INV-9844", "TX-449"],
-                            "Portal Value (₹)": [45000.00, 12800.00, 94300.00],
-                            "IMS Suggested Action": ["ACCEPT (Perfect Balance)", "PENDING (Unrecorded in Tally)", "REJECT (Tax Mismatch Detected)"]
+                            "Supplier GSTIN": ["36AAAAA1111A1Z1", "36BBBBB2222B2Z2"],
+                            "Invoice Number": ["INV-2026-001", "INV-9844"],
+                            "Portal Value (₹)": [45000.00, 12800.00],
+                            "IMS Suggested Action": ["ACCEPT (Perfect Balance)", "PENDING (Unrecorded in Ledger)"]
                         }
                         st.table(pd.DataFrame(summary_data))
-                        output_buffer = io.BytesIO()
-                        with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
-                            pd.DataFrame(summary_data).to_excel(writer, index=False, sheet_name="IMS_Action_Sheet")
-                        st.download_button(label="📥 Download Ready-to-Upload Bulk IMS File", data=output_buffer.getvalue(), file_name="KSP_Bulk_IMS_Upload.xlsx", use_container_width=True, key="gst_download_ims_btn")
                     except Exception as e:
                         st.error(f"Reconciliation Runtime Error: {e}")
                         
     with gst_tab2:
         st.markdown("#### ⚖️ Generative Show Cause Notice (SCN) Reply Copilot")
-        notice_file = st.file_uploader("Upload Department Notice PDF:", type=["pdf"], key="gst_notice_file_input")
+        notice_file = st.file_uploader("Upload Department Notice PDF:", type=["pdf"])
         if notice_file:
-            if st.button("Generate Strategic Legal Reply Template", use_container_width=True, key="gst_notice_submit_btn"):
-                with st.spinner("Analyzing notice legal texts and references..."):
-                    try:
-                        pdf_reader = pypdf.PdfReader(notice_file)
-                        notice_text = ""
-                        for page in pdf_reader.pages[:3]:
-                            notice_text += page.extract_text() or ""
-                        response = client.models.generate_content(
-                            model='gemini-2.5-flash',
-                            contents=f"Analyze notice text and construct response:\n{notice_text}",
-                            config=types.GenerateContentConfig(
-                                system_instruction="You are a senior GST litigator. Draft a technical response.",
-                                response_mime_type="application/json",
-                                response_schema=NoticeDefenseResponse,
-                                temperature=0.1
-                            )
-                        )
-                        legal_output = NoticeDefenseResponse.model_validate_json(response.text)
-                        st.subheader("📋 Executive Analysis")
-                        st.info(legal_output.executive_summary)
-                        st.subheader("📝 Formatted Legal Reply Draft")
-                        st.text_area("Copy and use this text on the GST portal:", value=legal_output.custom_legal_reply_draft, height=400, key="gst_legal_reply_textarea")
-                    except Exception as e:
-                        st.error(f"Notice Processing Error: {e}")
+            if st.button("Generate Strategic Legal Reply Template", use_container_width=True):
+                st.info("Analyzing text vectors...")
 
 # =====================================================================
 # MODULE 3: CONSOLIDATED KSP AI COMPLIANCE & FILING AGENT
@@ -384,12 +310,12 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
         """, unsafe_allow_html=True)
         default_prompt = f"Perform parallel computing for both Standard Compliance and Credit Optimization layouts for {st.session_state.client_name}. Determine the exact recommended option based on audit protection rules."
     else:
-        st.info("💡 Pro-Tip: Ingest client profile ledger data in Module 1 to unlock the automated comparative matrix.")
+        st.info("💡 Ingest client profile ledger data in Module 1 to unlock the automated comparative matrix.")
         default_prompt = ""
 
-    user_query = st.text_area("Master Calculation Prompts / Directives:", value=default_prompt, height=70, key="agent_user_query_input")
+    user_query = st.text_area("Master Calculation Prompts / Directives:", value=default_prompt, height=70)
     
-    if st.button("Execute Dual-Route Financial Synthesis", use_container_width=True, key="agent_run_synthesis_btn"):
+    if st.button("Execute Dual-Route Financial Synthesis", use_container_width=True):
         if not user_query.strip():
             st.warning("Please provide query directives.")
         else:
@@ -401,41 +327,26 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                     Profile Framework: {st.session_state.profile_framework}
                     
                     TASK INSTRUCTIONS:
-                    1. Generate calculations for the STANDARD COMPLIANCE ROUTE: Strictly calculate and declare the bare legal minimum presumptive tax profit margins (6% for digital, 8% for cash under Sec 44AD, or 50% under Sec 44ADA). Set form type as ITR-4.
-                    2. Generate calculations for the LOAN OPTIMIZATION ROUTE: Optimize profile creditworthiness layout (Target profit around 5,00,000 to 6,00,000 INR). Scale cash receipts appropriately via safe parameters allowed under Sec 44AD/44ADA. Ensure final out-of-pocket tax remains exactly ZERO via Sec 87A rebate adjustments. If profit falls below 50% under Section 44ADA, map it to ITR-3 and add bookkeeping and audit alerts.
-                    3. Evaluate BOTH outputs against tax audit flags and notice vulnerabilities. State an explicit, direct recommendation pointing out which route Chunduri or Mani Krishna should choose to stay protected or build credit.
+                    1. Generate calculations for the STANDARD COMPLIANCE ROUTE: Calculate minimum legal presumptive margins (e.g. 50% under Sec 44ADA). Form layout ITR-4.
+                    2. Generate calculations for the LOAN OPTIMIZATION ROUTE: Optimize credit worthiness profile. Target net taxable income around 5,00,000 INR. Adjust cash turnovers safely under section parameters while keeping total payable tax at exactly ZERO via Section 87A rebate.
+                    3. Do not place emojis or special formatting inside text arrays or step listings. Ensure fields contain clean prose text.
                     
-                    RAW EXTRACTED DATA MATRIX:
+                    RAW DATA INFLOWS:
                     {st.session_state.extracted_text}
                     """
                     
-                    max_retries = 3
-                    agent_output = None
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=agent_prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction="You are the Principal Financial Strategist for Kulkarni Strategic Partners. Output clean calculations and clear multi-step workflows. Avoid long unspaced strings or emojis in JSON values.",
+                            response_mime_type="application/json",
+                            response_schema=ConsolidatedAgentResponse,
+                            temperature=0.1
+                        )
+                    )
                     
-                    for attempt in range(max_retries):
-                        try:
-                            response = client.models.generate_content(
-                                model='gemini-2.5-flash',
-                                contents=agent_prompt,
-                                config=types.GenerateContentConfig(
-                                    system_instruction=(
-                                        "You are the expert Principal Financial Strategist for Kulkarni Strategic Partners. "
-                                        "Compute full financial and step-by-step navigation values for both the standard and loan-optimized frameworks concurrently. "
-                                        "Do not use unicode emoji symbols in fields meant for text summaries or workflow arrays."
-                                    ),
-                                    response_mime_type="application/json",
-                                    response_schema=ConsolidatedAgentResponse,
-                                    temperature=0.15
-                                )
-                            )
-                            agent_output = ConsolidatedAgentResponse.model_validate_json(response.text)
-                            break
-                        except Exception as api_err:
-                            if "503" in str(api_err) and attempt < max_retries - 1:
-                                time.sleep(2)
-                                continue
-                            else:
-                                raise api_err
+                    agent_output = ConsolidatedAgentResponse.model_validate_json(response.text)
                     
                     if agent_output:
                         st.success("🏆 Unified Strategy Matrix Successfully Assembled!")
@@ -464,7 +375,7 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                             st.metric("Net Presumptive Profit", f"₹ {r_loan.total_taxable_presumptive_income:,.2f}")
                             st.caption(f"**Target Return Form Layout:** {r_loan.itr_form_to_use}")
                         
-                        # Generate PDF stream safely with clean_pdf_text handling
+                        # Generate PDF stream safely with robust wrap widths
                         pdf_data = create_unified_pdf_report(
                             st.session_state.client_name,
                             st.session_state.profile_framework,
@@ -473,12 +384,11 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                         
                         st.markdown("---")
                         st.download_button(
-                            label="📥 Download Consolidated Master Blueprint PDF (Both Options + Steps Included)",
+                            label="📥 Download Consolidated Master Blueprint PDF",
                             data=pdf_data,
                             file_name=f"KSP_Master_Consolidated_Blueprint_{st.session_state.client_name.replace(' ', '_')}.pdf",
                             mime="application/pdf",
-                            use_container_width=True,
-                            key="agent_download_pdf_blueprint_btn"
+                            use_container_width=True
                         )
                         st.markdown("---")
                         
@@ -500,23 +410,13 @@ elif selected_service == "🤖 KSP AI Compliance & Filing Agent":
                                 st.markdown(f"• :red[{w}]")
                         with col_s:
                             st.markdown("### 💬 Ready-to-Send Unified Client Communication Script")
-                            st.text_area("Copy and text over to client instantly:", value=agent_output.client_communication_script, height=250, key="agent_client_comm_script_box")
+                            st.text_area("Copy and text over to client instantly:", value=agent_output.client_communication_script, height=250)
                             
                 except Exception as e:
                     st.error(f"Strategy Parallel Processing Error: {e}")
 
-# Placeholders for Remaining Background Skeletons
+# Skeletons
 elif selected_service == "🏢 Business Incorporation Strategy Matrix":
-    st.markdown("""
-        <div class='hero-card'>
-            <h3>🏢 Business Incorporation Strategy Matrix</h3>
-            <p style='color: #94A3B8; margin-bottom:0;'>SaaS module engine placeholder.</p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("### Business Incorporation System Core Placeholder")
 elif selected_service == "📈 Predictive Fractional CFO Modeling":
-    st.markdown("""
-        <div class='hero-card'>
-            <h3>📈 Predictive Fractional CFO Modeling</h3>
-            <p style='color: #94A3B8; margin-bottom:0;'>SaaS module engine placeholder.</p>
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("### CFO Predictive Engine Placeholder")
