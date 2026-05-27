@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import json
+import asyncio
+# Import your newly built background automation engine
+from fetch_engine import fetch_client_portal_data
 
 # Set premium, institutional-grade page configuration
 st.set_page_config(
@@ -24,10 +27,6 @@ st.markdown("""
 # CORE RECONCILIATION AUDIT ENGINE
 # -------------------------------------------------------------------
 def execute_system_reconciliation_audit(internal_ledger, portal_stream):
-    """
-    KSP Foundational Audit Module: Automatically reconciles internal client records 
-    against live portal data arrays to flag structural variances.
-    """
     audit_log = {
         "status": "PASS",
         "total_variance": 0.0,
@@ -48,7 +47,7 @@ def execute_system_reconciliation_audit(internal_ledger, portal_stream):
             
         elif internal_record['tax_credit'] != portal_record['tax_credit']:
             variance = abs(internal_record['tax_credit'] - portal_record['tax_credit'])
-            if variance > 0.05:  # Tolerance threshold parameter
+            if variance > 0.05:
                 audit_log["status"] = "FAIL"
                 audit_log["flagged_exceptions"].append({
                     "invoice": invoice_id,
@@ -88,8 +87,6 @@ if app_mode == "1. Dual-Route Optimization":
     
     with col2:
         st.markdown("### **Strategic Optimization Comparison**")
-        
-        # Presumptive taxation simulation under Section 44AD
         presumptive_rate = 0.06 if digital_receipts_pct >= 95 else 0.08
         simulated_presumptive_income = gross_turnover * presumptive_rate
         
@@ -113,29 +110,58 @@ if app_mode == "1. Dual-Route Optimization":
             st.info("Route A remains optimal for this financial layout profile.")
 
 # -------------------------------------------------------------------
-# WORKSPACE 2: SYSTEM RECONCILIATION AUDIT
+# WORKSPACE 2: SYSTEM RECONCILIATION AUDIT (INTEGRATED WITH CRAWLER)
 # -------------------------------------------------------------------
 elif app_mode == "2. System Reconciliation Audit":
     st.markdown('<div class="main-header">Automated System Audit Interface</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Internal control testing and ledger variance extraction</div>', unsafe_allow_html=True)
     
-    # Mock data arrays representing operational structures
+    # ⚡ NEW: Live Automation Trigger Section
+    st.markdown("### 🤖 **Automated Data Retrieval Control**")
+    st.caption("Execute an autonomous background web scraping instance to securely grab portal values for ₹0 cost.")
+    
+    target_url = st.text_input("Target Secure Portal Login URL", "https://example-compliance-portal.in/login")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        portal_user = st.text_input("Portal Username ID")
+    with c2:
+        portal_pass = st.text_input("Portal Password Secure", type="password")
+        
+    if st.button("⚡ Run Background Portal Ingestion Script"):
+        if not portal_user or not portal_pass:
+            st.warning("Please enter valid portal credentials to initialize the browser session.")
+        else:
+            with st.spinner("Launching headless Chromium browser instance via Playwright..."):
+                # Run the asynchronous scraping engine from within our Streamlit thread
+                execution_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(execution_loop)
+                extracted_data = execution_loop.run_until_complete(
+                    fetch_client_portal_data(target_url, portal_user, portal_pass, "#ledger-data-summary")
+                )
+                
+                if extracted_data["status"] == "SUCCESS":
+                    st.success("🎉 Background Data Stream Retrieved Natively for ₹0!")
+                    st.json(extracted_data)
+                else:
+                    st.error(f"Execution Log Flagged: {extracted_data['error']}")
+                    
+    st.markdown("---")
+    
+    # Static Audit Execution Block below
     mock_internal_ledger = {
         "INV-2026-001": {"amount": 50000.0, "tax_credit": 9000.0},
         "INV-2026-002": {"amount": 120000.0, "tax_credit": 21600.0},
         "INV-2026-003": {"amount": 75000.0, "tax_credit": 13500.0}
     }
-    
     mock_portal_stream = {
         "INV-2026-001": {"amount": 50000.0, "tax_credit": 9000.0},
-        "INV-2026-002": {"amount": 120000.0, "tax_credit": 18000.0},  # Mismatch engineered here
-        # INV-2026-003 missing from portal entirely to simulate data gap
+        "INV-2026-002": {"amount": 120000.0, "tax_credit": 18000.0},
     }
     
     st.markdown("### **Active Data Streams Flagged for Verification**")
     if st.button("Execute Core Reconciliation Audit Pipeline"):
         result = execute_system_reconciliation_audit(mock_internal_ledger, mock_portal_stream)
-        
         if result["status"] == "FAIL":
             st.error(f"❌ System Audit Flags Tripped! Total Variance Extracted: ₹{result['total_variance']:,.2f}")
             df_exceptions = pd.DataFrame(result["flagged_exceptions"])
