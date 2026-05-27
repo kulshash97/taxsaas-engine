@@ -17,3 +17,10 @@ streamlit
 requests
 beautifulsoup4
 pandas
+streamlit
+pandas
+google-genai
+pydantic
+pypdf
+fpdf2
+openpyxl
