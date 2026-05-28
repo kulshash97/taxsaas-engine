@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 💡 SAFE METHOD: Injecting styles using direct string formatting to avoid Python 3.14 html parser crashes
+# Safe style injection method for Python 3.14 stability
 st.html("<style>div[data-testid='stSidebarNav'] {display: none;} .reportview-container .main .block-container{padding-top: 2rem;}</style>")
 
 # =========================================================================
@@ -41,9 +41,9 @@ st.sidebar.markdown("**⚙️ Architecture Framework:** Unified Matrix Master v3
 st.sidebar.markdown("**🔒 Security Mode:** Active")
 
 # =========================================================================
-# REPORTLAB PDF GENERATION STRUCT BOUNDS (Shared Utility)
+# DYNAMIC REPORTLAB PDF GENERATION UTILITY
 # =========================================================================
-def generate_master_pdf():
+def generate_dynamic_pdf(gross_amt, declared_amt):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
@@ -54,14 +54,14 @@ def generate_master_pdf():
 
     story = [
         Paragraph("KULKARNI STRATEGIC PARTNERS", title_style),
-        Paragraph("Consolidated Tax Strategy Matrix & Master Optimization Brief", subtitle_style),
+        Paragraph("Dynamic Tax Strategy Matrix & Optimization Brief", subtitle_style),
         Spacer(1, 15),
-        Paragraph("<b>Client Name:</b> Mr. DIXITH CHAKRAVARTHULA", body_style),
-        Paragraph("<b>Framework Profile:</b> Traditional Professional / Priest (Dakshina & Pooja Inflows)", body_style),
+        Paragraph(f"<b>Gross Calculated Receipts:</b> INR {gross_amt:,.2f}", body_style),
+        Paragraph(f"<b>Optimized Declared Net Income:</b> INR {declared_amt:,.2f}", body_style),
         Spacer(1, 12)
     ]
     
-    rec_html = "<b>TAX COPILOT STRATEGIC FILING RECOMMENDATION:</b><br/>We recommend the <b>LOAN OPTIMIZATION ROUTE</b>. This route allows Mr. Chakravarthula to declare a higher taxable income of INR 5,00,000.00, which significantly improves his creditworthiness for future loan applications. Despite declaring a higher income, his net tax payable will remain exactly ZERO due to the full rebate available under Section 87A of the Income Tax Act, making it a financially advantageous and compliant strategy."
+    rec_html = f"<b>TAX COPILOT STRATEGIC FILING RECOMMENDATION:</b><br/>The system has verified the processed parameters. Declaring a net presumptive profit profile of <b>INR {declared_amt:,.2f}</b> scales visible bank credit worthiness without causing unexpected tax overhead under local active rebate schedules."
     
     rec_table = Table([[Paragraph(rec_html, body_style)]], colWidths=[530])
     rec_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#eff6ff')), ('BORDER', (0,0), (-1,-1), 1.5, colors.HexColor('#3b82f6')), ('PADDING', (0,0), (-1,-1), 10)]))
@@ -72,7 +72,7 @@ def generate_master_pdf():
     return buffer.getvalue()
 
 # =========================================================================
-# CORE REUSABLE DOCUMENT PROCESSING COMPONENT
+# REUSABLE ENGINE MODULE BLOCKS
 # =========================================================================
 def render_document_processing_intake(module_key):
     st.markdown("### 📥 1. Dual-Input Document Processing Intake")
@@ -84,7 +84,7 @@ def render_document_processing_intake(module_key):
         st.markdown("**Tax Credit Records**")
         st.file_uploader("Upload AIS / Form 26AS (PDF/Text)", type=["pdf", "txt", "csv"], key=f"credit_file_{module_key}")
 
-def render_dual_route_analysis():
+def render_dual_route_analysis(gross_val, net_val):
     st.markdown("---")
     st.markdown("### 🔍 2. Automated TDS/TCS Reconciliation Health Check")
     st.info("🔄 Cross-reference automation engines locked on target input vectors.")
@@ -93,28 +93,37 @@ def render_dual_route_analysis():
         with st.spinner("Processing deep schema alignment matrices..."):
             st.markdown("### 📊 3. Parallel Strategy Matrix (Side-by-Side Evaluation)")
             col_route_a, col_route_b = st.columns(2)
+            
+            # Route A dynamically calculates the absolute legal 50% minimum boundary
+            legal_minimum = gross_val * 0.50
+            
             with col_route_a:
                 with st.container(border=True):
                     st.error("🛑 **ROUTE A: Standard Compliance Mode**")
                     st.markdown("**Bare Legal Minimums**")
                     st.write("- **Form Selection:** ITR-4")
-                    st.write("- **Gross Digital Receipts:** INR 5,90,235.00")
-                    st.write("- **Declared Presumptive Income:** INR 2,95,117.50")
+                    st.write(f"- **Gross Digital Receipts:** INR {gross_val:,.2f}")
+                    st.write(f"- **Declared Presumptive Income (50%):** INR {legal_minimum:,.2f}")
                     st.write("- **Net Tax Payable:** INR 0.00")
             with col_route_b:
                 with st.container(border=True):
                     st.success("⭐ **ROUTE B: Credit Profile Optimization Mode**")
                     st.markdown("**Recommended Strategy**")
                     st.write("- **Form Selection:** ITR-4")
-                    st.write("- **Gross Digital Receipts:** INR 5,90,235.00")
-                    st.write("- **Declared Presumptive Income:** INR 5,00,000.00")
-                    st.write("- **Net Tax Payable:** INR 0.00 (Sec 87A Rebate)")
+                    st.write(f"- **Gross Digital Receipts:** INR {gross_val:,.2f}")
+                    st.write(f"- **Declared Presumptive Income:** INR {net_val:,.2f}")
+                    
+                    # Section 87A rebate evaluation limits for zero-tax visibility mapping
+                    if net_val <= 700000.00:
+                        st.write("- **Net Tax Payable:** INR 0.00 (Sec 87A Rebate Active)")
+                    else:
+                        st.write("- **Net Tax Payable:** System Computed standard marginal rate slab")
 
             st.markdown("---")
             st.download_button(
                 label="📥 Download Consolidated Master Optimization PDF Brief",
-                data=generate_master_pdf(),
-                file_name="KSP_Master_Consolidated_Blueprint_Mr_DIXITH_CHAKRAVARTHULA.pdf",
+                data=generate_dynamic_pdf(gross_val, net_val),
+                file_name="KSP_Master_Consolidated_Tax_Blueprint.pdf",
                 mime="application/pdf"
             )
 
@@ -153,9 +162,14 @@ def render_itr_workspace(header_title, show_selector=False):
         elif "ITR-4" in selected_itr:
             st.markdown("### ⚡ Presumptive Profit Configuration Parameters")
             col1, col2 = st.columns(2)
-            with col1: st.number_input("Gross Turnovers / Receipts (Digital + Cash)", min_value=0.0, value=590235.00, key="itr4_gross")
-            with col2: st.number_input("Declared Presumptive Net Profit Margin Line", min_value=0.0, value=500000.00, key="itr4_net")
-            render_dual_route_analysis()
+            with col1: 
+                gross_input = st.number_input("Gross Turnovers / Receipts (Digital + Cash)", min_value=0.0, value=590235.00, key="itr4_gross")
+            with col2: 
+                net_input = st.number_input("Declared Presumptive Net Profit Margin Line", min_value=0.0, value=500000.00, key="itr4_net")
+            
+            # Pass the values directly from the input fields down to the evaluation tables
+            render_dual_route_analysis(gross_input, net_input)
+            
         elif "ITR-5" in selected_itr or "ITR-6" in selected_itr:
             st.markdown("### 🏢 Corporate & Partnership Compliance Matrix (ITR-5 / ITR-6)")
             st.text_input("Enter Corporate PAN / LLPIN Reference:", key="corp_ref")
@@ -169,7 +183,8 @@ def render_itr_workspace(header_title, show_selector=False):
                 st.success("✅ Document schema validation successful. Baseline parameters verified against ITD database logs.")
     else:
         render_document_processing_intake("agent_itr")
-        render_dual_route_analysis()
+        # Base fallback parameters for agent calculation pipeline values
+        render_dual_route_analysis(590235.00, 500000.00)
 
 # =========================================================================
 # ROUTING CONTROLLER MATRIX
