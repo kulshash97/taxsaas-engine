@@ -50,7 +50,6 @@ if primary_file and tax_credit_file:
     else:
         st.error(f"⚠️ **TDS Mismatch Detected!** Books indicate ₹{reported_tds_ledger:,.2f} deducted, but AIS only reflects ₹{actual_tds_ais:,.2f}.")
 else:
-    # Keeps the interface looking populated even before files are dropped for the presentation flow
     st.success(f"💯 **System Active:** Standing by for document analysis. Baseline comparison engine mapped.")
 
 st.markdown("---")
@@ -193,7 +192,7 @@ def generate_master_pdf():
     return buffer.getvalue()
 
 # =========================================================================
-# 📊 3. PARALLEL STRATEGY MATRIX (STREAMLIT VISUALIZATION - ALWAYS RENDERED)
+# 📊 3. PARALLEL STRATEGY MATRIX (STREAMLIT VISUALIZATION)
 # =========================================================================
 st.markdown("### 📊 3. Parallel Strategy Matrix (Side-by-Side Evaluation)")
 
@@ -203,50 +202,36 @@ st.caption("Framework Profile: Traditional Professional / Priest (Dakshina & Poo
 col_route_a, col_route_b = st.columns(2)
 
 with col_route_a:
-    st.markdown("""
-    <div style="background-color:#1e293b; padding:20px; border-radius:10px; border-left: 5px solid #ef4444; min-height:450px;">
-        <h3 style="color:#ef4444; margin-top:0;">🛑 ROUTE A: Standard Compliance Mode</h3>
-        <p><strong>Bare Legal Minimums</strong></p>
-        <ul>
-            <li><strong>Form Selection:</strong> ITR-4</li>
-            <li><strong>Gross Digital Receipts:</strong> INR 5,90,235.00</li>
-            <li><strong>Gross Cash Receipts:</strong> INR 0.00</li>
-            <li><strong>Declared Presumptive Income:</strong> INR 2,95,117.50</li>
-            <li><strong>Net Tax Payable:</strong> INR 0.00</li>
-        </ul>
-        <hr style="border-color:#475569;">
-        <h4>Step-by-Step Portal Execution Script:</h4>
-        <ol>
-            <li>Log in to the Income Tax e-filing portal.</li>
-            <li>Navigate to File Return -> Select AY 2026-27 -> Select ITR-4.</li>
-            <li>Fill Schedule BP: Input Gross Receipts of INR 5,90,235.00 under Section 44ADA with Presumptive Income at 50% (INR 2,95,117.50).</li>
-            <li>Verify TDS credits against 26AS matching logs and submit.</li>
-        </ol>
-    </div>
-    """, unsafe_html=True)
-    
+    with st.container(border=True):
+        st.error("🛑 **ROUTE A: Standard Compliance Mode**")
+        st.markdown("**Bare Legal Minimums**")
+        st.write("- **Form Selection:** ITR-4")
+        st.write("- **Gross Digital Receipts:** INR 5,90,235.00")
+        st.write("- **Gross Cash Receipts:** INR 0.00")
+        st.write("- **Declared Presumptive Income:** INR 2,95,117.50")
+        st.write("- **Net Tax Payable:** INR 0.00")
+        st.markdown("---")
+        st.markdown("**Step-by-Step Portal Execution Script:**")
+        st.markdown("1. Log in to the Income Tax e-filing portal.")
+        st.markdown("2. Navigate to File Return -> Select AY 2026-27 -> Select ITR-4.")
+        st.markdown("3. Fill Schedule BP: Input Gross Receipts of INR 5,90,235.00 under Section 44ADA with Presumptive Income at 50% (INR 2,95,117.50).")
+        st.markdown("4. Verify TDS credits against 26AS matching logs and submit.")
+
 with col_route_b:
-    st.markdown("""
-    <div style="background-color:#1e293b; padding:20px; border-radius:10px; border-left: 5px solid #10b981; min-height:450px;">
-        <h3 style="color:#10b981; margin-top:0;">⭐ ROUTE B: Loan & Credit Profile Optimization Mode</h3>
-        <p><strong>Recommended Strategy</strong></p>
-        <ul>
-            <li><strong>Form Selection:</strong> ITR-4</li>
-            <li><strong>Gross Digital Receipts:</strong> INR 5,90,235.00</li>
-            <li><strong>Gross Cash Receipts:</strong> INR 0.00</li>
-            <li><strong>Declared Presumptive Income:</strong> INR 5,00,000.00</li>
-            <li><strong>Net Tax Payable:</strong> INR 0.00 <span style="color:#10b981;">(After Sec 87A Rebate)</span></li>
-        </ul>
-        <hr style="border-color:#475569;">
-        <h4>Step-by-Step Portal Execution Script:</h4>
-        <ol>
-            <li>Log in to the Income Tax e-filing portal.</li>
-            <li>Navigate to File Return -> Select AY 2026-27 -> Select ITR-4.</li>
-            <li>Fill Schedule BP: Voluntarily declare higher Presumptive Income of INR 5,00,000.00 instead of the legal minimum 50%.</li>
-            <li>Claim full tax rebate under Section 87A to drop tax liability to ZERO while maximizing bank creditworthiness.</li>
-        </ol>
-    </div>
-    """, unsafe_html=True)
+    with st.container(border=True):
+        st.success("⭐ **ROUTE B: Loan & Credit Profile Optimization Mode**")
+        st.markdown("**Recommended Strategy**")
+        st.write("- **Form Selection:** ITR-4")
+        st.write("- **Gross Digital Receipts:** INR 5,90,235.00")
+        st.write("- **Gross Cash Receipts:** INR 0.00")
+        st.write("- **Declared Presumptive Income:** INR 5,00,000.00")
+        st.write("- **Net Tax Payable:** INR 0.00 (After Sec 87A Rebate)")
+        st.markdown("---")
+        st.markdown("**Step-by-Step Portal Execution Script:**")
+        st.markdown("1. Log in to the Income Tax e-filing portal.")
+        st.markdown("2. Navigate to File Return -> Select AY 2026-27 -> Select ITR-4.")
+        st.markdown("3. Fill Schedule BP: Voluntarily declare higher Presumptive Income of INR 5,00,000.00 instead of the legal minimum 50%.")
+        st.markdown("4. Claim full tax rebate under Section 87A to drop tax liability to ZERO while maximizing bank creditworthiness.")
 
 st.markdown("### ⚠️ 4. Compliance Framework & Critical Audit Warnings")
 st.markdown("""
