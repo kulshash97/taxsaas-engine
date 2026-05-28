@@ -7,8 +7,22 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 
 # =========================================================================
-# 1. GLOBAL PLATFORM INITIALIZATION
+# GLOBAL STATIC STRING LITERALS (Pre-defined to comply with Python 3.14)
 # =========================================================================
+CSS_INJECTION = "<style>div[data-testid='stSidebarNav'] {display: none;} .reportview-container .main .block-container{padding-top: 2rem;}</style>"
+
+RECOMMENDATION_HTML = "<b>TAX COPILOT STRATEGIC FILING RECOMMENDATION:</b><br/>We recommend the <b>LOAN OPTIMIZATION ROUTE</b>. This route allows Mr. Chakravarthula to declare a higher taxable income of INR 5,00,000.00, which significantly improves his creditworthiness for future loan applications. Despite declaring a higher income, his net tax payable will remain exactly ZERO due to the full rebate available under Section 87A of the Income Tax Act, making it a financially advantageous and compliant strategy."
+
+ITR_OPTIONS = [
+    "ITR-1 (Sahaj - Salaried Individuals & House Property up to ₹50 Lakhs)",
+    "ITR-2 (Capital Gains, Foreign Assets, & Multiple House Properties)",
+    "ITR-3 (Individual Business Profits, Partners in Firms, & Cryptocurrencies)",
+    "ITR-4 (Sugam - Presumptive Business/Professional Taxation under 44AD/44ADA/44AE)",
+    "ITR-5 (Firms, LLPs, AOPs, BOIs, and Artificial Juridical Persons)",
+    "ITR-6 (Companies other than Section 11 Exemption Entities)",
+    "ITR-7 (Trusts, Political Parties, Charitable Institutions, & Research Associations)"
+]
+
 # =========================================================================
 # 1. GLOBAL PLATFORM INITIALIZATION
 # =========================================================================
@@ -18,17 +32,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Flattened styling string to comply with Python 3.14 strict parsing rules
-st.markdown("<style>div[data-testid='stSidebarNav'] {display: none;} .reportview-container .main .block-container{padding-top: 2rem;}</style>", unsafe_html=True)
-
-
-# Custom dark theme overrides to ensure layout scannability
-st.markdown("""
-    <style>
-    div[data-testid="stSidebarNav"] {display: none;}
-    .reportview-container .main .block-container{padding-top: 2rem;}
-    </style>
-""", unsafe_html=True)
+# Apply global styling overrides safely using the flat string variable
+st.markdown(CSS_INJECTION, unsafe_html=True)
 
 # =========================================================================
 # 2. FIXED SIDEBAR NAVIGATION MATRIX (Unified Master v3.0)
@@ -62,7 +67,6 @@ def generate_master_pdf():
     
     title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=20, leading=24, textColor=colors.HexColor('#1e3a8a'), alignment=TA_CENTER)
     subtitle_style = ParagraphStyle('DocSubTitle', parent=styles['Normal'], fontName='Helvetica', fontSize=12, leading=16, textColor=colors.HexColor('#475569'), alignment=TA_CENTER)
-    section_heading = ParagraphStyle('SectionHeading', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor('#1e3a8a'), spaceBefore=12, spaceAfter=6)
     body_style = ParagraphStyle('BodyTextCustom', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))
 
     story = [
@@ -74,8 +78,7 @@ def generate_master_pdf():
         Spacer(1, 12)
     ]
     
-    rec_html = "<b>TAX COPILOT STRATEGIC FILING RECOMMENDATION:</b><br/>We recommend the <b>LOAN OPTIMIZATION ROUTE</b>. This route allows Mr. Chakravarthula to declare a higher taxable income of INR 5,00,000.00, which significantly improves his creditworthiness for future loan applications. Despite declaring a higher income, his net tax payable will remain exactly ZERO due to the full rebate available under Section 87A of the Income Tax Act, making it a financially advantageous and compliant strategy."
-    rec_table = Table([[Paragraph(rec_html, body_style)]], colWidths=[530])
+    rec_table = Table([[Paragraph(RECOMMENDATION_HTML, body_style)]], colWidths=[530])
     rec_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#eff6ff')), ('BORDER', (0,0), (-1,-1), 1.5, colors.HexColor('#3b82f6')), ('PADDING', (0,0), (-1,-1), 10)]))
     story.append(rec_table)
     
@@ -130,79 +133,60 @@ def render_dual_route_analysis():
                 mime="application/pdf"
             )
 
+def render_itr_workspace(header_title, show_selector=False):
+    st.title("💼 KULKARNI STRATEGIC PARTNERS")
+    st.subheader(header_title)
+    st.markdown("---")
+    
+    if show_selector:
+        selected_itr = st.selectbox("Choose Target ITR Form for Processing:", ITR_OPTIONS, key="universal_itr_selector")
+        st.markdown("---")
+        render_document_processing_intake("smart_itr")
+        
+        if "ITR-1" in selected_itr:
+            st.markdown("### 🏢 Income Parameters (ITR-1)")
+            col1, col2 = st.columns(2)
+            with col1: st.number_input("Gross Salary Income (Sch Salary)", min_value=0.0, step=5000.0, key="itr1_sal")
+            with col2: st.number_input("Income from Other Sources", min_value=0.0, step=1000.0, key="itr1_oth")
+        elif "ITR-2" in selected_itr:
+            st.markdown("### 📈 Capital Gains & Global Asset Declaration (ITR-2)")
+            col1, col2 = st.columns(2)
+            with col1: st.number_input("Short-Term Capital Gains (Sec 111A)", min_value=0.0, key="itr2_stcg")
+            with col2: st.number_input("Long-Term Capital Gains (Sec 112A)", min_value=0.0, key="itr2_ltcg")
+        elif "ITR-3" in selected_itr:
+            st.markdown("### 💼 Audited Business Profits (ITR-3)")
+            st.info("System configured to run full P&L and Balance Sheet parsing arrays for scheduled audits.")
+        elif "ITR-4" in selected_itr:
+            st.markdown("### ⚡ Presumptive Profit Configuration Parameters")
+            col1, col2 = st.columns(2)
+            with col1: st.number_input("Gross Turnovers / Receipts (Digital + Cash)", min_value=0.0, value=590235.00, key="itr4_gross")
+            with col2: st.number_input("Declared Presumptive Net Profit Margin Line", min_value=0.0, value=500000.00, key="itr4_net")
+            render_dual_route_analysis()
+        elif "ITR-5" in selected_itr or "ITR-6" in selected_itr:
+            st.markdown("### 🏢 Corporate & Partnership Compliance Matrix (ITR-5 / ITR-6)")
+            st.text_input("Enter Corporate PAN / LLPIN Reference:", key="corp_ref")
+        elif "ITR-7" in selected_itr:
+            st.markdown("### 🏛️ Institutional, Trust, & Exempt Entity Engine (ITR-7)")
+            st.text_input("Section 11 / 12A / 10(23C) Registration Tracking Key:", key="trust_ref")
+
+        if "ITR-4" not in selected_itr:
+            st.markdown("---")
+            if st.button("Run Schema Validation and Cross-Verify Against JSON Mappings", key="generic_validate_btn"):
+                st.success("✅ Document schema validation successful. Baseline parameters verified against ITD database logs.")
+    else:
+        render_document_processing_intake("agent_itr")
+        render_dual_route_analysis()
+
 # =========================================================================
 # ROUTING CONTROLLER MATRIX
 # =========================================================================
 
-# MODULE 1: UNIVERSAL SMART ITR FILING ENGINE
 if module_selection == "🚀 High-Value Smart ITR Filing Engine":
-    st.title("🚀 High-Value Smart ITR Filing Engine")
-    st.subheader("Universal Statutory Filing Interface & Schema Validator")
-    st.markdown("---")
-    
-    selected_itr = st.selectbox(
-        "Choose Target ITR Form for Processing:",
-        [
-            "ITR-1 (Sahaj - Salaried Individuals & House Property up to ₹50 Lakhs)",
-            "ITR-2 (Capital Gains, Foreign Assets, & Multiple House Properties)",
-            "ITR-3 (Individual Business Profits, Partners in Firms, & Cryptocurrencies)",
-            "ITR-4 (Sugam - Presumptive Business/Professional Taxation under 44AD/44ADA/44AE)",
-            "ITR-5 (Firms, LLPs, AOPs, BOIs, and Artificial Juridical Persons)",
-            "ITR-6 (Companies other than Section 11 Exemption Entities)",
-            "ITR-7 (Trusts, Political Parties, Charitable Institutions, & Research Associations)"
-        ]
-    )
-    st.markdown("---")
-    
-    # Render the dual input fields for EVERY ITR form choice
-    render_document_processing_intake("smart_itr")
-    
-    # Dynamic form parameters loaded below the uploaders based on selection
-    if "ITR-1" in selected_itr:
-        st.markdown("### 🏢 Income Parameters (ITR-1)")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.number_input("Gross Salary Income (Sch Salary)", min_value=0.0, step=5000.0, key="itr1_sal")
-        with col2:
-            st.number_input("Income from Other Sources", min_value=0.0, step=1000.0, key="itr1_oth")
-            
-    elif "ITR-2" in selected_itr:
-        st.markdown("### 📈 Capital Gains & Global Asset Declaration (ITR-2)")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.number_input("Short-Term Capital Gains (Sec 111A)", min_value=0.0, key="itr2_stcg")
-        with col2:
-            st.number_input("Long-Term Capital Gains (Sec 112A)", min_value=0.0, key="itr2_ltcg")
+    render_itr_workspace("Universal Statutory Filing Interface & Schema Validator", show_selector=True)
 
-    elif "ITR-3" in selected_itr:
-        st.markdown("### 💼 Audited Business Profits (ITR-3)")
-        st.info("System configured to run full P&L and Balance Sheet parsing arrays for scheduled audits.")
+elif module_selection == "🎯 KSP AI Compliance & Filing Agent":
+    render_itr_workspace("Consolidated Tax Strategy Workspace & Master Optimization Dashboard", show_selector=False)
 
-    elif "ITR-4" in selected_itr:
-        st.markdown("### ⚡ Presumptive Profit Configuration Parameters")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.number_input("Gross Turnovers / Receipts (Digital + Cash)", min_value=0.0, value=590235.00, key="itr4_gross")
-        with col2:
-            st.number_input("Declared Presumptive Net Profit Margin Line", min_value=0.0, value=500000.00, key="itr4_net")
-            
-        # Hook Mr. Dixith's dynamic optimization synthesis right here inside the ITR-4 view
-        render_dual_route_analysis()
-
-    elif "ITR-5" in selected_itr or "ITR-6" in selected_itr:
-        st.markdown("### 🏢 Corporate & Partnership Compliance Matrix (ITR-5 / ITR-6)")
-        st.text_input("Enter Corporate PAN / LLPIN Reference:")
-
-    elif "ITR-7" in selected_itr:
-        st.markdown("### 🏛️ Institutional, Trust, & Exempt Entity Engine (ITR-7)")
-        st.text_input("Section 11 / 12A / 10(23C) Registration Tracking Key:")
-
-    if "ITR-4" not in selected_itr:
-        st.markdown("---")
-        if st.button("Run Schema Validation and Cross-Verify Against JSON Mappings"):
-            st.success("✅ Document schema validation successful. Baseline parameters verified against ITD database logs.")
-
-# MODULE 2: GST COMMAND CENTER
 elif module_selection == "🔵 GST Command Center Core":
     st.title("🔵 GST Command Center Core")
     st.subheader("Automated GSTR-1 / GSTR-3B Cross-Reconciliation Workspace")
@@ -215,38 +199,32 @@ elif module_selection == "🔵 GST Command Center Core":
         st.markdown("#### **Purchase / ITC Reconciliation Logs**")
         st.file_uploader("Upload GSTR-2B / Auto-Drafted Input Credit Statement", key="gst_in")
     st.markdown("---")
-    if st.button("Execute Cross-Portal Reconciliation Assessment"):
+    if st.button("Execute Cross-Portal Reconciliation Assessment", key="gst_recon_btn"):
         st.info("📊 Reconciliation engine complete: ITC match rate stands at 100% against inward supplier manifests.")
 
-# MODULE 3: THE EXPERT AI COMPLIANCE ENGINE
-elif module_selection == "🎯 KSP AI Compliance & Filing Agent":
-    render_itr_workspace("Consolidated Tax Strategy Workspace & Master Optimization Dashboard")
-
-# MODULE 4: BUSINESS INCORPORATION MATRIX
 elif module_selection == "🏢 Business Incorporation Strategy Matrix":
     st.title("🏢 Business Incorporation Strategy Matrix")
     st.subheader("Entity Optimization Workspace & Structural Capitalization Modeler")
     st.markdown("---")
     col_inc1, col_inc2 = st.columns(2)
     with col_inc1:
-        st.text_input("Proposed Enterprise Title Option 1:", value="Gatty Pet Foods")
-        st.selectbox("Target Corporate Structure:", ["Limited Liability Partnership (LLP)", "Private Limited Company (Pvt Ltd)", "One Person Company (OPC)", "Sole Proprietorship Framework"])
+        st.text_input("Proposed Enterprise Title Option 1:", value="Gatty Pet Foods", key="inc_title")
+        st.selectbox("Target Corporate Structure:", ["Limited Liability Partnership (LLP)", "Private Limited Company (Pvt Ltd)", "One Person Company (OPC)", "Sole Proprietorship Framework"], key="inc_struct")
     with col_inc2:
-        st.number_input("Proposed Initial Authorized Capital (INR):", min_value=100000, value=100000, step=50000)
+        st.number_input("Proposed Initial Authorized Capital (INR):", min_value=100000, value=100000, step=50000, key="inc_cap")
     st.markdown("---")
-    if st.button("Generate Comparative Statutory Structural Matrix"):
+    if st.button("Generate Comparative Statutory Structural Matrix", key="inc_matrix_btn"):
         st.success("📈 Entity optimization mapping completed. Tax compliance matrix saved to cache pipeline.")
 
-# MODULE 5: FRACTIONAL CFO MODELING
 elif module_selection == "📈 Predictive Fractional CFO Modeling":
     st.title("📈 Predictive Fractional CFO Modeling")
     st.subheader("Strategic Capital Valuation Engine & Liquidity Runway Modeler")
     st.markdown("---")
     col_cfo1, col_cfo2 = st.columns(2)
     with col_cfo1:
-        st.slider("Baseline Revenue Compound Annual Growth Projection (%)", min_value=0, max_value=100, value=25)
+        st.slider("Baseline Revenue Compound Annual Growth Projection (%)", min_value=0, max_value=100, value=25, key="cfo_slider")
     with col_cfo2:
-        st.number_input("Current Fixed Overhead Run Rate (Monthly):", min_value=0.0, value=50000.0)
+        st.number_input("Current Fixed Overhead Run Rate (Monthly):", min_value=0.0, value=50000.0, key="cfo_overhead")
     st.markdown("---")
-    if st.button("Simulate Operational Capital Cash Flow Trajectories"):
+    if st.button("Simulate Operational Capital Cash Flow Trajectories", key="cfo_sim_btn"):
         st.success("🚀 Cash flow projections compiled. Extended structural runway tracking at 24 months.")
