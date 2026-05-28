@@ -133,13 +133,23 @@ def generate_incorporation_pdf(title, structure, capital):
     story.append(Paragraph("<b>Proposed Corporate Parameters:</b>", heading))
     story.append(Paragraph(f"- Proposed Enterprise Title Option 1: <b>{title}</b>", body))
     story.append(Paragraph(f"- Selected Corporate Structure: <b>{structure}</b>", body))
-    story.append(Paragraph(f"- Proposed Initial Authorized Capital: <b>INR {capital:,.2f}</b>", body))
-    story.append(Spacer(1, 10))
-    story.append(Paragraph("MANDATORY STATUTORY DOCUMENTS REQUIRED:", heading))
-    story.append(Paragraph("1. <b>Identity Proofs:</b> Clear PAN and Aadhaar records for all proposed partners/directors.", body))
-    story.append(Paragraph("2. <b>Address Proofs:</b> Latest Bank Statements or Utility bills (not older than 2 months) showing exact matching names.", body))
-    story.append(Paragraph("3. <b>Registered Office:</b> Utility Bill (Electricity/Gas) along with a signed No-Objection Certificate (NOC) from the structural asset landlord.", body))
-    story.append(Paragraph("4. <b>Digital Credentials:</b> Class-3 Digital Signature Certificates (DSC) must be mapped for filing authorization forms via MCA v3 portal systems.", body))
+    
+    if structure == "Sole Proprietorship Framework":
+        story.append(Paragraph("- Capital Structure: <b>Initial Proprietorship Capital Investment Setup</b>", body))
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("MANDATORY COMMERCIAL DOCKET DOCUMENTS REQUIRED:", heading))
+        story.append(Paragraph("1. <b>Identity Proofs:</b> Clear Proprietor PAN Card and Aadhaar Link verification logs.", body))
+        story.append(Paragraph("2. <b>Address Proofs:</b> Two independent utility bills (Electricity/Gas/Mobile) matching identity records.", body))
+        story.append(Paragraph("3. <b>Commercial Proofs:</b> Local Shop & Establishment certificate or MSME Udyam Registration parameters.", body))
+        story.append(Paragraph("4. <b>Financial Node:</b> Resolution brief and certificate to initialize a dedicated commercial Current Account with underwriting partners.", body))
+    else:
+        story.append(Paragraph(f"- Proposed Initial Authorized Capital: <b>INR {capital:,.2f}</b>", body))
+        story.append(Spacer(1, 10))
+        story.append(Paragraph("MANDATORY STATUTORY DOCUMENTS REQUIRED:", heading))
+        story.append(Paragraph("1. <b>Identity Proofs:</b> Clear PAN and Aadhaar records for all proposed partners/directors.", body))
+        story.append(Paragraph("2. <b>Address Proofs:</b> Latest Bank Statements or Utility bills (not older than 2 months) showing exact matching names.", body))
+        story.append(Paragraph("3. <b>Registered Office:</b> Utility Bill (Electricity/Gas) along with a signed No-Objection Certificate (NOC) from the structural asset landlord.", body))
+        story.append(Paragraph("4. <b>Digital Credentials:</b> Class-3 Digital Signature Certificates (DSC) must be mapped for filing authorization forms via MCA v3 portal systems.", body))
     
     doc.build(story)
     buffer.seek(0)
@@ -149,10 +159,24 @@ def generate_cfo_pdf(cagr, overhead):
     buffer, doc, styles, story, body, heading = create_base_pdf_story("KSP", "Predictive Fractional CFO Growth Strategy & Liquidity Runway Brief")
     
     story.append(Paragraph("<b>Financial Modeling Matrix Baselines:</b>", heading))
-    story.append(Paragraph(f"- Projected Annual Revenue CAGR Line: <b>{cagr}%</b>", body))
-    story.append(Paragraph(f"- Current Fixed Overhead Monthly Run Rate: <b>INR {overhead:,.2f}</b>", body))
-    story.append(Paragraph("- Estimated Core Working Capital Runway Status: <b>24 Months Operational Safety</b>", body))
+    
+    # Render financial metrics inside a highly professional structured table element
+    table_data = [
+        [Paragraph("<b>Metric Vector</b>", body), Paragraph("<b>Evaluated Threshold</b>", body)],
+        [Paragraph("Projected Revenue CAGR", body), Paragraph(f"{cagr}%", body)],
+        [Paragraph("Monthly Operational Fixed Cost Overhead", body), Paragraph(f"INR {overhead:,.2f}", body)],
+        [Paragraph("Calculated Cash Core Capital Runway", body), Paragraph("24 Months Safety Zone", body)]
+    ]
+    metric_table = Table(table_data, colWidths=[260, 260])
+    metric_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#eff6ff')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.HexColor('#1e3a8a')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#cbd5e1')),
+        ('PADDING', (0,0), (-1,-1), 6),
+    ]))
+    story.append(metric_table)
     story.append(Spacer(1, 10))
+    
     story.append(Paragraph("CFO STRATEGIC RECOMMENDATIONS & METRICS:", heading))
     story.append(Paragraph("1. <b>Working Capital Lock:</b> Keep 3 months of fixed cash operating costs reserves untouched to shield ongoing supply pipelines.", body))
     story.append(Paragraph("2. <b>Capital Allocation Optimization:</b> Direct incremental margins above baseline thresholds to high-yield short-term debt instruments or inventory scale expansions.", body))
@@ -163,7 +187,7 @@ def generate_cfo_pdf(cagr, overhead):
     return buffer.getvalue()
 
 # =========================================================================
-# CORE WORKSPACE FUNCTIONAL ROUTER
+# CORE WORKSPACE DISPLAY RE-ENGINEERING
 # =========================================================================
 def render_comprehensive_workspace(header_title, show_selector=False):
     st.title("💼 KULKARNI STRATEGIC PARTNERS")
@@ -261,6 +285,9 @@ def render_comprehensive_workspace(header_title, show_selector=False):
                     key=f"dl_action_{module_key}"
                 )
     else:
+        col1, col2 = st.columns(2)
+        with col1: st.number_input("Parsed Gross Turnovers / Receipts:", min_value=0.0, value=0.00, disabled=True, key=f"disabled_gross_{module_key}")
+        with col2: st.number_input("Target Declared Presumptive Net Profit Margin Line:", min_value=0.0, value=0.00, disabled=True, key=f"disabled_net_{module_key}")
         st.warning("⚠️ Baseline calculation parameters empty. Please upload BOTH a valid Primary Bank Statement and corresponding Tax Credit Records (AIS) above to initiate structural system calculations.")
 
 # =========================================================================
