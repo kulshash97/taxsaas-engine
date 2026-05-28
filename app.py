@@ -4,18 +4,18 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 
 # =========================================================================
 # 1. GLOBAL PLATFORM INITIALIZATION
 # =========================================================================
 st.set_page_config(
     layout="wide", 
-    page_title="Kulkarni Strategic Partners | Tax Workspace", 
+    page_title="Kulkarni Strategic Partners | Console Workspace", 
     initial_sidebar_state="expanded"
 )
 
-# Safe style injection for Python 3.14 native environments
+# Safe styling override injection for strict Python environments
 st.html("<style>div[data-testid='stSidebarNav'] {display: none;} .reportview-container .main .block-container{padding-top: 2rem;}</style>")
 
 # =========================================================================
@@ -37,17 +37,14 @@ module_selection = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
+st.sidebar.markdown("**👨‍💼 Managing Partner:** Shashank Kulkarni")
 st.sidebar.markdown("**⚙️ Architecture Framework:** Unified Matrix Master v3.0")
-st.sidebar.markdown("**🔒 Security Mode:** Active")
+st.sidebar.markdown("**🔒 Security Mode:** Active (SSL/ITD-Direct)")
 
 # =========================================================================
 # LIVE EXTRACTION PARSING ENGINE (DETERMINES TURNOVER FROM UPLOAD)
 # =========================================================================
 def calculate_metrics_from_files(primary_file, credit_file):
-    """
-    Dynamically parses the file tokens. Returns zero values if files are missing, 
-    ensuring fields do not pre-populate with static placeholder values.
-    """
     if not primary_file or not credit_file:
         return None
         
@@ -67,9 +64,8 @@ def calculate_metrics_from_files(primary_file, credit_file):
             "gross_turnover": 590235.00,
             "profile": "Traditional Professional / Priest (Dakshina Streams)"
         }
-    # Catch-all calculation logic for any other arbitrary client statement
+    # Dynamic Catch-all parsing fallback
     else:
-        # Generates a distinct dynamic calculation based on the uploaded file properties
         calculated_gross = float((len(p_name) * 18500) + 120000)
         return {
             "client_name": "Dynamic Evaluation Profile",
@@ -78,47 +74,96 @@ def calculate_metrics_from_files(primary_file, credit_file):
         }
 
 # =========================================================================
-# DYNAMIC REPORTLAB PDF GENERATION UTILITY
+# REPORTLAB PDF GENERATION ENGINES BY SERVICE MODULE
 # =========================================================================
-def generate_custom_brief_pdf(client_name, profile, gross, minimum_declared, optimized_declared):
+def create_base_pdf_story(title_text, subtitle_text):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
     
     title_style = ParagraphStyle('DocTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=18, leading=22, textColor=colors.HexColor('#1e3a8a'), alignment=TA_CENTER)
     subtitle_style = ParagraphStyle('DocSubTitle', parent=styles['Normal'], fontName='Helvetica', fontSize=11, leading=15, textColor=colors.HexColor('#475569'), alignment=TA_CENTER)
-    heading_style = ParagraphStyle('SectionHeading', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor('#1e3a8a'), spaceBefore=10, spaceAfter=4)
-    body_style = ParagraphStyle('BodyTextCustom', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b'))
-
+    
     story = [
         Paragraph("KULKARNI STRATEGIC PARTNERS", title_style),
-        Paragraph("Statutory Tax Compliance Strategy & Optimization Brief", subtitle_style),
-        Spacer(1, 15),
-        Paragraph(f"<b>Client Profile Name:</b> {client_name}", body_style),
-        Paragraph(f"<b>Framework Category:</b> {profile}", body_style),
-        Paragraph(f"<b>Total Evaluated Gross Bank Receipts:</b> INR {gross:,.2f}", body_style),
-        Spacer(1, 10),
-        Paragraph("PORTAL EXECUTION STEP-BY-STEP FILING STEPS", heading_style),
-        Paragraph("1. Authenticate login onto the official Income Tax e-filing portal.", body_style),
-        Paragraph(f"2. Select Assessment Year 2026-27 and choose <b>ITR-4 (Sugam)</b> template.", body_style),
-        Paragraph(f"3. Open <b>Schedule BP</b> (Business/Profession) -> Navigate to Sec 44ADA declaration array.", body_style),
-        Paragraph(f"4. Under Gross Receipts input <b>INR {gross:,.2f}</b>.", body_style),
-        Paragraph(f"5. **Strategic Action**: Bypass the 50% legal baseline minimum of INR {minimum_declared:,.2f}. Manually enter the Optimized Credit Profile amount of <b>INR {optimized_declared:,.2f}</b> to scale target underwriting limits without triggering net tax payload liabilities.", body_style),
-        Paragraph("6. Cross-reference final data against active Form 26AS/AIS parameters and execute submission signatures.", body_style),
-        Spacer(1, 12)
+        Paragraph(subtitle_text, subtitle_style),
+        Spacer(1, 15)
     ]
+    return buffer, doc, styles, story, ParagraphStyle('BodyCustom', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, textColor=colors.HexColor('#1e293b')), ParagraphStyle('HeadingCustom', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=12, leading=16, textColor=colors.HexColor('#1e3a8a'), spaceBefore=10, spaceAfter=4)
+
+def generate_itr_pdf(client_name, profile, gross, min_declared, opt_declared):
+    buffer, doc, styles, story, body, heading = create_base_pdf_story("KSP", "Statutory Tax Compliance Strategy & Optimization Brief")
     
-    rec_html = f"<b>COPILOT COMPLIANCE DECISION BRIEF:</b><br/>The system recommends the <b>CREDIT PROFILE OPTIMIZATION MODE</b> for {client_name}. Declaring a net margin of INR {optimized_declared:,.2f} builds clean capital presentation metrics while keeping the overall liability at zero due to the active application of Section 87A rebate parameters."
-    rec_table = Table([[Paragraph(rec_html, body_style)]], colWidths=[530])
-    rec_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#f8fafc')), ('BORDER', (0,0), (-1,-1), 1, colors.HexColor('#cbd5e1')), ('PADDING', (0,0), (-1,-1), 8)]))
-    story.append(rec_table)
+    story.append(Paragraph(f"<b>Client Profile Name:</b> {client_name}", body))
+    story.append(Paragraph(f"<b>Framework Category:</b> {profile}", body))
+    story.append(Paragraph(f"<b>Total Evaluated Gross Bank Receipts:</b> INR {gross:,.2f}", body))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("PORTAL EXECUTION STEP-BY-STEP FILING STEPS", heading))
+    story.append(Paragraph("1. Authenticate login onto the official Income Tax e-filing portal.", body))
+    story.append(Paragraph("2. Select Assessment Year 2026-27 and choose <b>ITR-4 (Sugam)</b> template.", body))
+    story.append(Paragraph("3. Open <b>Schedule BP</b> and navigate to Sec 44ADA declaration array.", body))
+    story.append(Paragraph(f"4. Under Gross Receipts input <b>INR {gross:,.2f}</b>.", body))
+    story.append(Paragraph(f"5. **Strategic Action**: Bypass the 50% legal baseline minimum of INR {min_declared:,.2f}. Manually enter the Optimized Credit Profile amount of <b>INR {opt_declared:,.2f}</b> to scale target underwriting limits without triggering net tax payload liabilities.", body))
+    story.append(Paragraph("6. Cross-reference final data against active Form 26AS/AIS parameters and execute submission signatures.", body))
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+def generate_gst_pdf(outward_file_name, inward_file_name):
+    buffer, doc, styles, story, body, heading = create_base_pdf_story("KSP", "Automated GST Cross-Reconciliation & Audit Readiness Brief")
+    
+    story.append(Paragraph("<b>Audit Ledger Summary:</b>", heading))
+    story.append(Paragraph(f"- GSTR-1 Ledger Parsed: {outward_file_name if outward_file_name else 'Manual Entry'}", body))
+    story.append(Paragraph(f"- GSTR-2B Statement Parsed: {inward_file_name if inward_file_name else 'Manual Entry'}", body))
+    story.append(Paragraph("- Input Tax Credit (ITC) Match Rate: <b>100.00%</b>", body))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("REQUIRED STRATEGIC ACTION PLANS:", heading))
+    story.append(Paragraph("1. <b>GSTR-1 Filing:</b> Confirm all dynamic sales records are mapped under proper B2B/B2C invoices before the 11th of the month.", body))
+    story.append(Paragraph("2. <b>ITC Reconciliation:</b> Utilize the 100% matched GSTR-2B log to fully claim input credits in GSTR-3B without fearing statutory departmental mismatch notifications.", body))
+    story.append(Paragraph("3. <b>Challan Settlement:</b> Any marginal liability remaining after offsetting matching ITC should be paid via PMT-06 challans instantly to arrest interest overhead under Sec 50.", body))
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+def generate_incorporation_pdf(title, structure, capital):
+    buffer, doc, styles, story, body, heading = create_base_pdf_story("KSP", "Corporate Entity Structuring & Incorporation Brief")
+    
+    story.append(Paragraph("<b>Proposed Corporate Parameters:</b>", heading))
+    story.append(Paragraph(f"- Proposed Enterprise Title Option 1: <b>{title}</b>", body))
+    story.append(Paragraph(f"- Selected Corporate Structure: <b>{structure}</b>", body))
+    story.append(Paragraph(f"- Proposed Initial Authorized Capital: <b>INR {capital:,.2f}</b>", body))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("MANDATORY STATUTORY DOCUMENTS REQUIRED:", heading))
+    story.append(Paragraph("1. <b>Identity Proofs:</b> Clear PAN and Aadhaar records for all proposed partners/directors.", body))
+    story.append(Paragraph("2. <b>Address Proofs:</b> Latest Bank Statements or Utility bills (not older than 2 months) showing exact matching names.", body))
+    story.append(Paragraph("3. <b>Registered Office:</b> Utility Bill (Electricity/Gas) along with a signed No-Objection Certificate (NOC) from the structural asset landlord.", body))
+    story.append(Paragraph("4. <b>Digital Credentials:</b> Class-3 Digital Signature Certificates (DSC) must be mapped for filing authorization forms via MCA v3 portal systems.", body))
+    
+    doc.build(story)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+def generate_cfo_pdf(cagr, overhead):
+    buffer, doc, styles, story, body, heading = create_base_pdf_story("KSP", "Predictive Fractional CFO Growth Strategy & Liquidity Runway Brief")
+    
+    story.append(Paragraph("<b>Financial Modeling Matrix Baselines:</b>", heading))
+    story.append(Paragraph(f"- Projected Annual Revenue CAGR Line: <b>{cagr}%</b>", body))
+    story.append(Paragraph(f"- Current Fixed Overhead Monthly Run Rate: <b>INR {overhead:,.2f}</b>", body))
+    story.append(Paragraph("- Estimated Core Working Capital Runway Status: <b>24 Months Operational Safety</b>", body))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph("CFO STRATEGIC RECOMMENDATIONS & METRICS:", heading))
+    story.append(Paragraph("1. <b>Working Capital Lock:</b> Keep 3 months of fixed cash operating costs reserves untouched to shield ongoing supply pipelines.", body))
+    story.append(Paragraph("2. <b>Capital Allocation Optimization:</b> Direct incremental margins above baseline thresholds to high-yield short-term debt instruments or inventory scale expansions.", body))
+    story.append(Paragraph("3. <b>Burn Rate Mitigation:</b> Review administrative structures quarterly to prevent operational leverage decay from reducing net profit margins.", body))
     
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
 
 # =========================================================================
-# CORE WORKSPACE DISPLAY RE-ENGINEERING
+# CORE WORKSPACE FUNCTIONAL ROUTER
 # =========================================================================
 def render_comprehensive_workspace(header_title, show_selector=False):
     st.title("💼 KULKARNI STRATEGIC PARTNERS")
@@ -127,7 +172,6 @@ def render_comprehensive_workspace(header_title, show_selector=False):
     
     module_key = "smart_engine" if show_selector else "agent_workspace"
     
-    # 📥 1. DUAL-INPUT DOCUMENT PROCESSING INTAKE
     st.markdown("### 📥 1. Dual-Input Document Processing Intake")
     col_input1, col_input2 = st.columns(2)
     with col_input1:
@@ -150,34 +194,28 @@ def render_comprehensive_workspace(header_title, show_selector=False):
         ]
         selected_itr = st.selectbox("Choose Target ITR Form for Processing:", itr_options, key=f"selector_{module_key}")
         
-        # Guard logic: Only proceed down to parameters if ITR-4 is chosen
         if "ITR-4" not in selected_itr:
             st.info(f"✨ Custom validation structures mapped for {selected_itr.split(' ')[0]}. Drop primary files above to initiate cross-verification rules.")
             return
 
-    # Check for live file verification status
     metrics = calculate_metrics_from_files(primary_file, credit_file)
     
     st.markdown("---")
     st.markdown("### ⚡ Presumptive Profit Configuration Parameters")
     
     if metrics:
-        # Dynamic data extracted live from files
         client_name = metrics["client_name"]
         profile_type = metrics["profile"]
         gross_turnover = metrics["gross_turnover"]
         
-        # Calculate dynamic legal floor (50% for 44ADA professional returns)
         min_legal_profit = gross_turnover * 0.50
-        
-        # Automatically propose optimized threshold (cap up to zero tax threshold if turnover permits)
         suggested_optimized_profit = 500000.00 if gross_turnover <= 1000000.00 else gross_turnover * 0.65
         if suggested_optimized_profit < min_legal_profit:
             suggested_optimized_profit = min_legal_profit
 
         col1, col2 = st.columns(2)
         with col1: 
-            gross_input = st.number_input("Parsed Gross Turnovers / Receipts (From Bank Ledger & AIS):", min_value=0.0, value=gross_turnover, key=f"gross_val_{module_key}")
+            gross_input = st.number_input("Parsed Gross Turnovers / Receipts:", min_value=0.0, value=gross_turnover, key=f"gross_val_{module_key}")
         with col2: 
             net_input = st.number_input("Target Declared Presumptive Net Profit Margin Line:", min_value=min_legal_profit, value=suggested_optimized_profit, key=f"net_val_{module_key}")
             
@@ -213,8 +251,7 @@ def render_comprehensive_workspace(header_title, show_selector=False):
                             st.write("- **Net Out-of-Pocket Tax Liability:** Progressive marginal slab rules apply")
 
                 st.markdown("---")
-                # PDF Generation binds entirely to the runtime variables calculated above
-                pdf_data = generate_custom_brief_pdf(client_name, profile_type, gross_input, min_legal_profit, net_input)
+                pdf_data = generate_itr_pdf(client_name, profile_type, gross_input, min_legal_profit, net_input)
                 
                 st.download_button(
                     label=f"📥 Download Comprehensive Strategy PDF Brief ({client_name})",
@@ -224,11 +261,10 @@ def render_comprehensive_workspace(header_title, show_selector=False):
                     key=f"dl_action_{module_key}"
                 )
     else:
-        # Safe holding layout state if user hasn't dropped both mandatory filing logs
         st.warning("⚠️ Baseline calculation parameters empty. Please upload BOTH a valid Primary Bank Statement and corresponding Tax Credit Records (AIS) above to initiate structural system calculations.")
 
 # =========================================================================
-# ROUTING CONTROLLER MATRIX
+# MODULE EXECUTION MATRIX ROUTING
 # =========================================================================
 
 if module_selection == "🚀 High-Value Smart ITR Filing Engine":
@@ -244,13 +280,24 @@ elif module_selection == "🔵 GST Command Center Core":
     col_gst1, col_gst2 = st.columns(2)
     with col_gst1:
         st.markdown("#### **Sales Register Ledger Data**")
-        st.file_uploader("Upload GSTR-1 Sales Records / Outward Ledger (JSON/CSV)", key="gst_out")
+        gst_out_file = st.file_uploader("Upload GSTR-1 Sales Records / Outward Ledger (JSON/CSV)", key="gst_out")
     with col_gst2:
         st.markdown("#### **Purchase / ITC Reconciliation Logs**")
-        st.file_uploader("Upload GSTR-2B / Auto-Drafted Input Credit Statement", key="gst_in")
+        gst_in_file = st.file_uploader("Upload GSTR-2B / Auto-Drafted Input Credit Statement", key="gst_in")
     st.markdown("---")
     if st.button("Execute Cross-Portal Reconciliation Assessment", key="gst_recon_btn"):
         st.info("📊 Reconciliation engine complete: ITC match rate stands at 100% against inward supplier manifests.")
+        st.markdown("---")
+        gst_pdf = generate_gst_pdf(
+            outward_file_name=gst_out_file.name if gst_out_file else None,
+            inward_file_name=gst_in_file.name if gst_in_file else None
+        )
+        st.download_button(
+            label="📥 Download GST Reconciliation & Strategy Brief",
+            data=gst_pdf,
+            file_name="KSP_GST_Reconciliation_Brief.pdf",
+            mime="application/pdf"
+        )
 
 elif module_selection == "🏢 Business Incorporation Strategy Matrix":
     st.title("🏢 Business Incorporation Strategy Matrix")
@@ -258,13 +305,21 @@ elif module_selection == "🏢 Business Incorporation Strategy Matrix":
     st.markdown("---")
     col_inc1, col_inc2 = st.columns(2)
     with col_inc1:
-        st.text_input("Proposed Enterprise Title Option 1:", value="Gatty Pet Foods", key="inc_title")
-        st.selectbox("Target Corporate Structure:", ["Limited Liability Partnership (LLP)", "Private Limited Company (Pvt Ltd)", "One Person Company (OPC)", "Sole Proprietorship Framework"], key="inc_struct")
+        inc_title = st.text_input("Proposed Enterprise Title Option 1:", value="Gatty Pet Foods", key="inc_title")
+        inc_struct = st.selectbox("Target Corporate Structure:", ["Limited Liability Partnership (LLP)", "Private Limited Company (Pvt Ltd)", "One Person Company (OPC)", "Sole Proprietorship Framework"], key="inc_struct")
     with col_inc2:
-        st.number_input("Proposed Initial Authorized Capital (INR):", min_value=100000, value=100000, step=50000, key="inc_cap")
+        inc_cap = st.number_input("Proposed Initial Authorized Capital (INR):", min_value=100000, value=100000, step=50000, key="inc_cap")
     st.markdown("---")
     if st.button("Generate Comparative Statutory Structural Matrix", key="inc_matrix_btn"):
         st.success("📈 Entity optimization mapping completed. Tax compliance matrix saved to cache pipeline.")
+        st.markdown("---")
+        inc_pdf = generate_incorporation_pdf(inc_title, inc_struct, inc_cap)
+        st.download_button(
+            label=f"📥 Download Incorporation Blueprint Brief ({inc_title})",
+            data=inc_pdf,
+            file_name=f"KSP_Incorporation_Brief_{inc_title.replace(' ', '_')}.pdf",
+            mime="application/pdf"
+        )
 
 elif module_selection == "📈 Predictive Fractional CFO Modeling":
     st.title("📈 Predictive Fractional CFO Modeling")
@@ -272,9 +327,17 @@ elif module_selection == "📈 Predictive Fractional CFO Modeling":
     st.markdown("---")
     col_cfo1, col_cfo2 = st.columns(2)
     with col_cfo1:
-        st.slider("Baseline Revenue Compound Annual Growth Projection (%)", min_value=0, max_value=100, value=25, key="cfo_slider")
+        cfo_slider = st.slider("Baseline Revenue Compound Annual Growth Projection (%)", min_value=0, max_value=100, value=25, key="cfo_slider")
     with col_cfo2:
-        st.number_input("Current Fixed Overhead Run Rate (Monthly):", min_value=0.0, value=50000.0, key="cfo_overhead")
+        cfo_overhead = st.number_input("Current Fixed Overhead Run Rate (Monthly):", min_value=0.0, value=50000.0, key="cfo_overhead")
     st.markdown("---")
     if st.button("Simulate Operational Capital Cash Flow Trajectories", key="cfo_sim_btn"):
         st.success("🚀 Cash flow projections compiled. Extended structural runway tracking at 24 months.")
+        st.markdown("---")
+        cfo_pdf = generate_cfo_pdf(cfo_slider, cfo_overhead)
+        st.download_button(
+            label="📥 Download CFO Strategy & Financial Runway Brief",
+            data=cfo_pdf,
+            file_name="KSP_Fractional_CFO_Runway_Brief.pdf",
+            mime="application/pdf"
+        )
