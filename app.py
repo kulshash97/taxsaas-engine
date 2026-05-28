@@ -9,11 +9,18 @@ from reportlab.lib.enums import TA_CENTER
 # =========================================================================
 # 1. GLOBAL PLATFORM INITIALIZATION
 # =========================================================================
+# =========================================================================
+# 1. GLOBAL PLATFORM INITIALIZATION
+# =========================================================================
 st.set_page_config(
     layout="wide", 
     page_title="Kulkarni Strategic Partners | Tax Workspace", 
     initial_sidebar_state="expanded"
 )
+
+# Flattened styling string to comply with Python 3.14 strict parsing rules
+st.markdown("<style>div[data-testid='stSidebarNav'] {display: none;} .reportview-container .main .block-container{padding-top: 2rem;}</style>", unsafe_html=True)
+
 
 # Custom dark theme overrides to ensure layout scannability
 st.markdown("""
