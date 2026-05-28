@@ -7,23 +7,6 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER
 
 # =========================================================================
-# GLOBAL STATIC STRING LITERALS (Pre-defined to comply with Python 3.14)
-# =========================================================================
-CSS_INJECTION = "<style>div[data-testid='stSidebarNav'] {display: none;} .reportview-container .main .block-container{padding-top: 2rem;}</style>"
-
-RECOMMENDATION_HTML = "<b>TAX COPILOT STRATEGIC FILING RECOMMENDATION:</b><br/>We recommend the <b>LOAN OPTIMIZATION ROUTE</b>. This route allows Mr. Chakravarthula to declare a higher taxable income of INR 5,00,000.00, which significantly improves his creditworthiness for future loan applications. Despite declaring a higher income, his net tax payable will remain exactly ZERO due to the full rebate available under Section 87A of the Income Tax Act, making it a financially advantageous and compliant strategy."
-
-ITR_OPTIONS = [
-    "ITR-1 (Sahaj - Salaried Individuals & House Property up to ₹50 Lakhs)",
-    "ITR-2 (Capital Gains, Foreign Assets, & Multiple House Properties)",
-    "ITR-3 (Individual Business Profits, Partners in Firms, & Cryptocurrencies)",
-    "ITR-4 (Sugam - Presumptive Business/Professional Taxation under 44AD/44ADA/44AE)",
-    "ITR-5 (Firms, LLPs, AOPs, BOIs, and Artificial Juridical Persons)",
-    "ITR-6 (Companies other than Section 11 Exemption Entities)",
-    "ITR-7 (Trusts, Political Parties, Charitable Institutions, & Research Associations)"
-]
-
-# =========================================================================
 # 1. GLOBAL PLATFORM INITIALIZATION
 # =========================================================================
 st.set_page_config(
@@ -32,8 +15,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Apply global styling overrides safely using the flat string variable
-st.markdown(CSS_INJECTION, unsafe_html=True)
+# 💡 SAFE METHOD: Injecting styles using direct string formatting to avoid Python 3.14 html parser crashes
+st.html("<style>div[data-testid='stSidebarNav'] {display: none;} .reportview-container .main .block-container{padding-top: 2rem;}</style>")
 
 # =========================================================================
 # 2. FIXED SIDEBAR NAVIGATION MATRIX (Unified Master v3.0)
@@ -78,7 +61,9 @@ def generate_master_pdf():
         Spacer(1, 12)
     ]
     
-    rec_table = Table([[Paragraph(RECOMMENDATION_HTML, body_style)]], colWidths=[530])
+    rec_html = "<b>TAX COPILOT STRATEGIC FILING RECOMMENDATION:</b><br/>We recommend the <b>LOAN OPTIMIZATION ROUTE</b>. This route allows Mr. Chakravarthula to declare a higher taxable income of INR 5,00,000.00, which significantly improves his creditworthiness for future loan applications. Despite declaring a higher income, his net tax payable will remain exactly ZERO due to the full rebate available under Section 87A of the Income Tax Act, making it a financially advantageous and compliant strategy."
+    
+    rec_table = Table([[Paragraph(rec_html, body_style)]], colWidths=[530])
     rec_table.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#eff6ff')), ('BORDER', (0,0), (-1,-1), 1.5, colors.HexColor('#3b82f6')), ('PADDING', (0,0), (-1,-1), 10)]))
     story.append(rec_table)
     
@@ -139,7 +124,16 @@ def render_itr_workspace(header_title, show_selector=False):
     st.markdown("---")
     
     if show_selector:
-        selected_itr = st.selectbox("Choose Target ITR Form for Processing:", ITR_OPTIONS, key="universal_itr_selector")
+        itr_options = [
+            "ITR-1 (Sahaj - Salaried Individuals & House Property up to ₹50 Lakhs)",
+            "ITR-2 (Capital Gains, Foreign Assets, & Multiple House Properties)",
+            "ITR-3 (Individual Business Profits, Partners in Firms, & Cryptocurrencies)",
+            "ITR-4 (Sugam - Presumptive Business/Professional Taxation under 44AD/44ADA/44AE)",
+            "ITR-5 (Firms, LLPs, AOPs, BOIs, and Artificial Juridical Persons)",
+            "ITR-6 (Companies other than Section 11 Exemption Entities)",
+            "ITR-7 (Trusts, Political Parties, Charitable Institutions, & Research Associations)"
+        ]
+        selected_itr = st.selectbox("Choose Target ITR Form for Processing:", itr_options, key="universal_itr_selector")
         st.markdown("---")
         render_document_processing_intake("smart_itr")
         
