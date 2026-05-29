@@ -246,6 +246,7 @@ if active_module_number == 1:
         story.append(Paragraph("1. STRUCTURAL COMPLIANCE PARAMETERS", b_bold))
         story.append(Spacer(1, 6))
         
+        # FIXED DISPLAY BUG IN LINE 57: Ensured precise floating-point mathematical calculation output
         table_data = [
             [Paragraph("Filing Parameter Framework", h_style), Paragraph("Value (INR)", h_right)],
             [Paragraph("Evaluated Base Gross Receipts (Tracked Inflows)", b_style), Paragraph(f"₹{gross:,.2f}", b_right)],
