@@ -96,10 +96,17 @@ if selected_module == "🚀 Module 1: Smart ITR Filing Engine":
     
     with panel_left:
         st.subheader("📥 Data Ingestion Hub")
-        uploaded_statement = st.file_uploader("Upload Bank Statement (CSV / TXT)", type=["csv", "txt"])
+        
+        # FIXED: Added "pdf" to the file types array to accept your document formats cleanly
+        uploaded_statement = st.file_uploader("Upload Bank Statement (PDF / CSV / TXT)", type=["pdf", "csv", "txt"])
+        if uploaded_statement is not None:
+            st.toast(f"📄 Ingested file: {uploaded_statement.name}", icon="✅")
+            
         manual_inflow = st.number_input("Gross Account Inflows (INR Baseline)", min_value=0, value=1450000, step=50000)
         cash_ratio = st.slider("Cash Component Ratio (%)", min_value=0, max_value=100, value=4)
-        uploaded_ais = st.file_uploader("Upload Annual Information Statement (AIS)", type=["json", "txt"])
+        
+        # FIXED: Added "pdf" to the AIS ingestion channel as well
+        uploaded_ais = st.file_uploader("Upload Annual Information Statement (AIS) (PDF / JSON / TXT)", type=["pdf", "json", "txt"])
         
         fallback_ais_data = {
             "SFT-006": {"description": "High-Value Mutual Fund Purchase", "value": 1500000}
