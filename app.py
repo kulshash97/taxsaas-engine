@@ -16,8 +16,7 @@ st.set_page_config(
 def parse_live_bank_statement(file_buffered):
     """
     Reads the actual PDF file lines, extracts the legal account holder name,
-    identifies valid credit/deposit transactions, and sums them up dynamically.
-    Zero fake fallback hardcodings.
+    and isolates genuine Credit Inflows by filtering out trailing Running Balances.
     """
     total_credits = 0.0
     account_name = "Unknown Client"
@@ -32,32 +31,41 @@ def parse_live_bank_statement(file_buffered):
                 full_text_dump += text + "\n"
         
         # 1. Dynamic Client Name Extraction Loop
-        name_match = re.search(r'(?:Name|Account Name)\s*["\s:]*([A-Z\s]{4,50})', full_text_dump, re.IGNORECASE)
+        name_match = re.search(r'(?:Account Name|Name)\s*["\s:]*([A-Z\s]{4,50})', full_text_dump, re.IGNORECASE)
         if name_match:
             extracted_name = name_match.group(1).strip()
-            # Clean up line breaks or trailing quotes common in tabular PDF parsers
-            account_name = extracted_name.replace('"', '').replace('\n', ' ').strip()
+            # Clean out multi-line address or garbage tokens from table headers
+            account_name = extracted_name.split('\n')[0].replace('"', '').strip()
 
-        # 2. Extract and Sum Live Credit Transactions
-        # Matches formats like '2000.00(Cr)', '45,000.00 Cr', or transaction amounts flagged as credits
+        # 2. Extract and Sum Real Credit Transactions Only
         lines = full_text_dump.split('\n')
         for line in lines:
-            # Look specifically for lines indicating an inflow/credit to eliminate debits/balances
-            if "Cr" in line or "Credit" in line or "Deposit" in line:
-                # Find all decimal/integer numeric configurations in proximity to the credit flag
-                numbers = re.findall(r'(\d[\d,]*\.\d{2})', line)
-                if numbers:
-                    # The transaction value is typically the first matched amount before the running balance
-                    raw_amount = numbers[0].replace(',', '')
-                    try:
-                        # Validate against accidental picking of running balances on the far right
-                        val = float(raw_amount)
-                        # Sanity ceiling to skip reading account balances as individual credits
-                        if "Balance" not in line or line.index(numbers[0]) < line.lower().find("balance"):
-                            total_credits += val
-                    except ValueError:
-                        continue
+            # Check if the line contains a transaction trace
+            if "(Cr)" in line or "(Dr)" in line:
+                # Find all currency/numeric strings on this line
+                all_amounts = re.findall(r'(\d[\d,]*\.\d{2})', line)
+                
+                if all_amounts:
+                    # In a typical row: the last number is ALWAYS the running balance column.
+                    # We pop it out so it is NEVER added to our income calculations.
+                    running_balance = all_amounts[-1]
+                    remaining_numbers = all_amounts[:-1]
+                    
+                    # If there's a number left and the line explicitly flags a transaction credit line
+                    # Look for the transaction indicator right next to the value
+                    if remaining_numbers:
+                        target_inflow = remaining_numbers[-1].replace(',', '')
+                        # Confirm that this specific row transaction was a Credit, not a Debit
+                        # It must have '(Cr)' positioned before the running balance string segment
+                        balance_idx = line.find(running_balance)
+                        inflow_segment = line[:balance_idx]
                         
+                        if "(Cr)" in inflow_segment:
+                            try:
+                                total_credits += float(target_inflow)
+                            except ValueError:
+                                continue
+                                
         return round(total_credits, 2), account_name
     except Exception as e:
         st.error(f"OCR Parsing Exception: Unable to compute ledger file safely. Error details: {str(e)}")
@@ -159,12 +167,11 @@ selected_module = st.sidebar.radio("Select Platform Track to Execute:", ["🚀 M
 # FILING ENGINE REAL DATA PIPELINE
 # =====================================================================
 if selected_module == "🚀 Module 1: Smart ITR Filing Engine":
-    st.header("🚀 Module 1: Smart ITR Filing Engine (Live Extraction)")
+    st.header("🚀 Module 1: Smart ITR Filing Engine (Live Separation Core)")
     st.caption("Filing Engine Core | Statutory Alignment: Income Tax Act, 1961")
     
     panel_left, panel_right = st.columns([1, 1])
     
-    # Strict Zero Baseline Initialization
     extracted_turnover = 0.0
     client_name = "Not Identified"
     
@@ -173,18 +180,14 @@ if selected_module == "🚀 Module 1: Smart ITR Filing Engine":
         uploaded_statement = st.file_uploader("Upload Bank Statement (PDF ONLY)", type=["pdf"])
         
         if uploaded_statement is not None:
-            # Run the actual text parsing engine over the document stream bytes
             extracted_turnover, client_name = parse_live_bank_statement(uploaded_statement)
             if extracted_turnover > 0:
                 st.success(f"🔗 OCR Match Found! Client Identified: **{client_name}**")
             else:
                 st.warning("⚠️ Scanned PDF contains zero explicit credit entries or text layer is non-readable images.")
         
-        # Form overrides match live telemetry data points
         final_inflow = st.number_input("Gross Account Inflows Verified (INR)", min_value=0.0, value=float(extracted_turnover), step=5000.0)
         cash_ratio = st.slider("Cash Component Ratio (%)", min_value=0, max_value=100, value=0)
-        
-        # Real-time AIS Matching input (Enforcing zero preset assumptions)
         ais_input_val = st.number_input("Enter Actual AIS High Value Investment Figure (INR)", min_value=0.0, value=0.0, step=5000.0)
 
     with panel_right:
