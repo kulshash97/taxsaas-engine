@@ -29,8 +29,6 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #111827; border-right: 1px solid #1F2937; }
     div[data-testid='stSidebarNav'] {display: none;}
     div[data-testid="stContainer"] { background-color: #1F2937; border: 1px solid #374151 !important; border-radius: 10px; padding: 20px; }
-    .locked-feature { filter: blur(4px); opacity: 0.4; pointer-events: none; user-select: none; }
-    .paywall-badge { background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); color: #000000; padding: 6px 12px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; display: inline-block; margin-bottom: 15px; }
     input, select, textarea { background-color: #111827 !important; color: #FFFFFF !important; border: 1px solid #4B5563 !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -52,35 +50,30 @@ try:
 except Exception:
     pass
 
-def parse_pdf_text_layers(uploaded_file, file_password=""):
-    """Extracts raw text content from uploaded file bytes, bypassing encryption if provided."""
+def parse_pdf_text_layers(uploaded_file):
+    """Extracts raw text content from decrypted/unlocked uploaded file bytes."""
     if uploaded_file is None:
         return ""
     try:
         pdf_reader = pypdf.PdfReader(uploaded_file)
-        
-        if pdf_reader.is_encrypted:
-            if file_password:
-                pdf_reader.decrypt(file_password)
-            else:
-                return "LOCKED_PREVENTED"
-                
         compiled_text = ""
         for page in pdf_reader.pages:
             compiled_text += page.extract_text() or ""
         return compiled_text.replace('\n', ' ')
-    except Exception as e:
+    except Exception:
         return ""
 
 def parse_bank_statement_credits(text):
     """Specific parser scanning for Indian banking layout credit summations."""
+    if not text:
+        return 0.0
     clean_text = text.replace(',', '')
     patterns = [
-        r"Total\s+Credits?[\s\S]{0,30}?([\d]+\.\d{2})",
-        r"Total\s+Deposit(?:s)?[\s\S]{0,30}?([\d]+\.\d{2})",
-        r"Credit\s+Summation[\s\S]{0,20}?([\d]+\.\d{2})",
+        r"Total\s+Credits?[\s\S]{0,40}?([\d]+\.\d{2})",
+        r"Total\s+Deposit(?:s)?[\s\S]{0,40}?([\d]+\.\d{2})",
+        r"Credit\s+Summation[\s\S]{0,30}?([\d]+\.\d{2})",
         r"Total\s+Cr[\.\s]+([\d]+\.\d{2})",
-        r"SUM\s+OF\s+CREDITS[\s\S]{0,20}?([\d]+\.\d{2})"
+        r"SUM\s+OF\s+CREDITS[\s\S]{0,30}?([\d]+\.\d{2})"
     ]
     for pattern in patterns:
         matches = re.findall(pattern, clean_text, re.IGNORECASE)
@@ -91,6 +84,8 @@ def parse_bank_statement_credits(text):
 
 def parse_ais_turnover(text):
     """Specific parser searching for specialized Information Statement tax schedules."""
+    if not text:
+        return 0.0
     clean_text = text.replace(',', '')
     patterns = [
         r"Business\s+receipts[\s\S]{0,50}?([\d]+\.\d{2})",
@@ -116,13 +111,6 @@ TENANT_REGISTRY = {
         "tier": "👑 Elite Partner Tier",
         "managing_head": "Shashank Kulkarni",
         "allowed_modules": [1, 2, 3, 4, 5, 6]
-    },
-    "tax_pro_hyderabad": {
-        "firm_name": "S. R. MURTHY & CO. CHARTERED ACCOUNTANTS",
-        "pass": "murthyca",
-        "tier": "🔵 Growth Practice Tier",
-        "managing_head": "S. R. Murthy, FCA",
-        "allowed_modules": [1, 2, 5, 6] 
     }
 }
 
@@ -167,7 +155,6 @@ module_options_map = {
 module_selection = st.sidebar.radio("Navigate Workspace", options=list(module_options_map.keys()), label_visibility="collapsed")
 active_module_number = module_options_map[module_selection]
 active_firm_name = tenant_profile["firm_name"]
-is_locked = active_module_number not in tenant_profile["allowed_modules"]
 
 # =========================================================================
 # 5. REUSEABLE PREMIUM PDF STYLING CORE & LAYOUT ENGINE
@@ -226,31 +213,30 @@ if active_module_number == 1:
     
     col1, col2 = st.columns(2)
     with col1: 
-        p_file = st.file_uploader("Upload Primary Bank Statement (PDF)", type=["pdf"], key="m1_p1")
-        p_pass = st.text_input("Bank Statement Password (if locked):", type="password", key="m1_p1_pass")
+        p_file = st.file_uploader("Upload Decrypted Primary Bank Statement (PDF)", type=["pdf"], key="m1_p1")
     with col2: 
-        c_file = st.file_uploader("Upload Official AIS Record (PDF)", type=["pdf"], key="m1_c1")
-        c_pass = st.text_input("AIS Password (if locked):", type="password", key="m1_c1_pass")
+        c_file = st.file_uploader("Upload Decrypted Official AIS Record (PDF)", type=["pdf"], key="m1_c1")
         
     extracted_bank_val = 0.00
     extracted_ais_val = 0.00
     
-    if p_file or c_file:
-        primary_text = parse_pdf_text_layers(p_file, p_pass) if p_file else ""
-        ais_text = parse_pdf_text_layers(c_file, c_pass) if c_file else ""
-        
-        if primary_text == "LOCKED_PREVENTED":
-            st.error(f"❌ Bank Statement is encrypted. Please enter the correct password to allow extraction.")
+    # Process Files if uploaded
+    if p_file:
+        primary_text = parse_pdf_text_layers(p_file)
+        if not primary_text.strip():
+            st.toast(f"⚠️ Note: '{p_file.name}' contains no readable text layers. It might be a flattened image copy.", icon="ℹ️")
         else:
             extracted_bank_val = parse_bank_statement_credits(primary_text)
             
-        if ais_text == "LOCKED_PREVENTED":
-            st.error(f"❌ AIS Document is encrypted. Please enter the correct password to allow extraction.")
+    if c_file:
+        ais_text = parse_pdf_text_layers(c_file)
+        if not ais_text.strip():
+            st.toast(f"⚠️ Note: '{c_file.name}' contains no readable text layers. It might be a flattened image copy.", icon="ℹ️")
         else:
             extracted_ais_val = parse_ais_turnover(ais_text)
             
     st.markdown("### 🛠️ Data Extraction Verification & Manual Override Console")
-    st.info("If the uploaded document is an image or uses a non-standard custom format, the values below will show 0.00. You can type the actual values below to manually verify and sync your records.")
+    st.info("If your printed/saved PDF layout has been flattened into a graphic image layer, look up the values visually and confirm them below to instantly update the automation parameters.")
     
     col_v1, col_v2 = st.columns(2)
     with col_v1:
@@ -258,7 +244,6 @@ if active_module_number == 1:
     with col_v2:
         final_ais_val = st.number_input("Verified AIS Annual Taxable Turnover (INR):", min_value=0.0, value=extracted_ais_val, step=5000.0)
         
-    # Choose the definitive baseline for calculations
     target_gross = max(final_bank_val, final_ais_val)
     variance_delta = abs(final_bank_val - final_ais_val)
     
@@ -268,14 +253,13 @@ if active_module_number == 1:
         with col_m1:
             st.metric("Definitive Working Gross Revenue", f"{CURRENCY_SYM}{target_gross:,.2f}")
         with col_m2:
-            st.metric("Bank vs AIS Variance Delta", f"{CURRENCY_SYM}{variance_delta:,.2f}", delta=f"{'-' if variance_delta > 0 else ''}Variance Detected", delta_color="inverse" if variance_delta > 0 else "normal")
+            st.metric("Bank vs AIS Variance Delta", f"{CURRENCY_SYM}{variance_delta:,.2f}", delta=f"{'-' if variance_delta > 0 else ''}Variance Accounted", delta_color="inverse" if variance_delta > 0 else "normal")
         with col_m3:
             recommended_form = "ITR-4 (Sugam)" if "Priest" in client_profession_type or "Professional" in client_profession_type or "Business" in client_profession_type else "ITR-1 (Sahaj)"
             if target_gross > 5000000.00:
                 recommended_form = "ITR-3 / ITR-2 Schedule"
             st.metric("Mandated Tax Filing Form", recommended_form)
             
-        # Ratios mapping
         is_professional_44ada = "Professional" in client_profession_type or "Priest" in client_profession_type
         if recommended_form == "ITR-4 (Sugam)":
             min_legal_ratio = 0.50 if is_professional_44ada else 0.06
@@ -313,7 +297,6 @@ if active_module_number == 1:
         story.append(t)
         story.append(Spacer(1, 12))
         
-        # DYNAMIC FILING PROTOCOL PORTAL STEP-BY-STEP GENERATOR
         story.append(Paragraph("2. OFFICIAL GOVERNMENT PORTAL FILING STEP-BY-STEP PROCESS", b_bold))
         story.append(Spacer(1, 4))
         
@@ -332,7 +315,7 @@ if active_module_number == 1:
             story.append(Spacer(1, 5))
             
         story.append(Spacer(1, 15))
-        story.append(Paragraph("Disclaimer: Prepared strictly as a private optimization guide under the statutory provisions of the Income-tax Act, 2025.", d_style))
+        story.append(Paragraph("Disclaimer: Prepared strictly as a private optimization guide under the statutory provisions of applicable Income Tax rules.", d_style))
         
         doc.build(story)
         st.download_button(
@@ -343,9 +326,8 @@ if active_module_number == 1:
             use_container_width=True
         )
     else:
-        st.warning("📊 Waiting for raw data layers. Upload your files or input your financial parameters above to generate the platform reconciliation models.")
+        st.warning("📊 Waiting for data layers. Drag and drop your saved PDF files or type the financial parameters into the manual console above to generate the advisory blueprints.")
 
-# --- SEAMLESS MAINTENANCE FOR ADDITIONAL APP MODULES ---
 elif active_module_number == 2:
     st.title(f"🏢 {active_firm_name}")
     st.subheader("Entity Optimization Workspace & Structural Capitalization Matrix")
