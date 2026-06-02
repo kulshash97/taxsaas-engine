@@ -27,3 +27,9 @@ openpyxl
 pypdf>=4.0.0
 pypdf>=4.0.0
 pypdf>=4.0.0
+streamlit
+pypdf
+reportlab
+pandas
+numpy
+google-generativeai
