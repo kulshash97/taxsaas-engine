@@ -26,3 +26,4 @@ fpdf2
 openpyxl
 pypdf>=4.0.0
 pypdf>=4.0.0
+pypdf>=4.0.0
