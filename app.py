@@ -12,11 +12,11 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- LIVE OCR & BANKING TRANSACTION EXTRACTION ENGINE ---
-def parse_live_bank_statement(file_buffered):
+# --- ENGINE A: UNIVERSAL BANK STATEMENT INFLOW PARSER ---
+def parse_universal_bank_statement(file_buffered):
     """
-    Surgically isolates genuine banking credit inflows by checking explicit transaction markers
-    (e.g., UPI credits, transfers) and safely ignoring running balance columns.
+    Universally extracts professional/business credit inflows across any Indian bank statement layout.
+    Filters out running balances and debit transactions dynamically using adaptive keyword profiling.
     """
     total_credits = 0.0
     account_name = "Unknown Client"
@@ -24,54 +24,112 @@ def parse_live_bank_statement(file_buffered):
     try:
         reader = PdfReader(file_buffered)
         full_text_dump = ""
-        
         for page in reader.pages:
             text = page.extract_text()
             if text:
                 full_text_dump += text + "\n"
-        
-        # 1. Isolate Account Holder Name Safely
-        name_match = re.search(r'(?:Account Name|Name)\s*["\s:]*([A-Z\s]{4,50})', full_text_dump, re.IGNORECASE)
+                
+        # Universal Name Extraction Profile
+        name_match = re.search(r'(?:Account Name|Name|Customer Name)\s*["\s:]*([A-Z\s\.]{4,50})', full_text_dump, re.IGNORECASE)
         if name_match:
-            extracted_name = name_match.group(1).strip()
-            account_name = extracted_name.split('\n')[0].replace('"', '').strip()
+            account_name = name_match.group(1).strip().split('\n')[0].replace('"', '').strip()
 
-        # 2. Extract Real Credit Transactions Only
         lines = full_text_dump.split('\n')
         for line in lines:
-            # A line MUST contain a transaction direction flag to be processed
-            if "(Cr)" in line:
-                # To be a genuine income inflow/deposit, the line text description must match 
-                # explicit banking credit tokens (e.g., UPI incoming, clear transfers, deposits)
-                # This explicitly blocks matching the 'Running Balance' column column text.
-                is_genuine_credit = any(marker in line.upper() for marker in ["CR/", "BY ", "NEFT/", "IMPS/", "CREDIT", "DEPOSIT"])
+            line_clean = line.strip()
+            
+            # Universal Skip Filters (Headers, summaries, or metadata instructions)
+            if any(x in line_clean.lower() for x in ["page", "date range", "opening balance", "closing balance", "summary"]):
+                continue
+            
+            # Explicit Debit Elimination Filter (Prevents outflows from being misclassified as inflows)
+            if any(dr_flag in line_clean.upper() for dr_flag in ["(DR)", " DEBIT ", "WITHDRAWAL", " CHQ ", "-"]):
+                if not any(cr_flag in line_clean.upper() for cr_flag in ["(CR)", "CREDIT"]):
+                    continue # Skip pure debits completely
+            
+            # Identify all decimal amounts representing financial volumes
+            amounts = re.findall(r'(\d[\d,]*\.\d{2})', line_clean)
+            if not amounts:
+                continue
                 
-                if is_genuine_credit:
-                    # Find all numbers with decimals on this line
-                    amounts = re.findall(r'(\d[\d,]*\.\d{2})', line)
+            # If line is verified to have a credit component or is a standard UPI/Inward deposit
+            if any(cr_flag in line_clean.upper() for cr_flag in ["(CR)", "CREDIT", "CR/"]) or "UPI/" in line_clean.upper() or "NEFT" in line_clean.upper() or "RTGS" in line_clean.upper():
+                # Convert string items to floats safely
+                parsed_vals = [float(val.replace(',', '')) for val in amounts]
+                
+                if len(parsed_vals) >= 2:
+                    # In almost all double-column layouts (HDFC, SBI, Union, ICICI):
+                    # The transaction amount appears BEFORE the remaining running account balance.
+                    # We pick the smaller or first token, ensuring the massive running balance isn't ingested.
+                    if line_clean.count("(Cr)") == 2 or "BALANCE" in line_clean.upper() or parsed_vals[1] > parsed_vals[0]*3:
+                        total_credits += parsed_vals[0]
+                    else:
+                        total_credits += parsed_vals[0]
+                elif len(parsed_vals) == 1:
+                    total_credits += parsed_vals[0]
                     
-                    if len(amounts) >= 2:
-                        # Standard Row: amounts[0] is the transaction amount, amounts[1] is the running balance
-                        # If the line contains a debit indicator as well, skip it to be safe
-                        if "(Dr)" not in line:
-                            try:
-                                total_credits += float(amounts[0].replace(',', ''))
-                            except ValueError:
-                                continue
-                    elif len(amounts) == 1:
-                        # Fallback row alignment check
-                        try:
-                            total_credits += float(amounts[0].replace(',', ''))
-                        except ValueError:
-                            continue
-                                
         return round(total_credits, 2), account_name
     except Exception as e:
-        st.error(f"OCR Parsing Exception: Unable to compute ledger safely. Error: {str(e)}")
+        st.error(f"Bank Statement Ingestion Failure: {str(e)}")
         return 0.0, "Parsing Error State"
 
 
-# --- CORE MATH MODULE FOR COMPLIANCE ---
+# --- ENGINE B: AUTOMATED AIS (ANNUAL INFORMATION STATEMENT) EXTRACTION CORE ---
+def parse_income_tax_ais(file_buffered):
+    """
+    Ingests official Annual Information Statement (AIS) documents.
+    Scans for high-value investment signatures (Mutual Funds, Equities, High Real Estate, SFTs).
+    """
+    detected_high_value_investments = 0.0
+    ais_signatures_found = []
+    
+    try:
+        reader = PdfReader(file_buffered)
+        ais_text = ""
+        for page in reader.pages:
+            t = page.extract_text()
+            if t:
+                ais_text += t + "\n"
+        
+        # Look for SFT patterns or Investment Summary metrics
+        # Standard AIS forms lay out sections for SFT-005, SFT-006 (Mutual Funds, Stocks, Dividends)
+        investment_patterns = [
+            (r'(?:Purchase of mutual fund|Mutual Fund)\s+.*?(\d[\d,]*\.\d{2}|\d[\d,]+)', "Mutual Fund Ingestion"),
+            (r'(?:Purchase of shares|Equities|Stocks)\s+.*?(\d[\d,]*\.\d{2}|\d[\d,]+)', "Equity Market Placement"),
+            (r'(?:Sale/Purchase of immovable property)\s+.*?(\d[\d,]*\.\d{2}|\d[\d,]+)', "Real Estate Footprint"),
+            (r'(?:SFT-\d{3})\s+.*?(\d[\d,]*\.\d{2}|\d[\d,]+)', "Specified Financial Transaction (SFT)")
+        ]
+        
+        for pattern, label in investment_patterns:
+            matches = re.finditer(pattern, ais_text, re.IGNORECASE)
+            for match in matches:
+                amt_str = match.group(1).replace(',', '')
+                if '.' not in amt_str:
+                    val = float(amt_str)
+                else:
+                    val = float(amt_str)
+                
+                if val > 50000: # Highlight material high value components
+                    detected_high_value_investments += val
+                    ais_signatures_found.append(f"Found {label}: ₹{val:,}")
+                    
+        # Fallback broad search if specific labels are tightly structured in tabular format
+        if detected_high_value_investments == 0.0:
+            # Check for generic continuous text numbers tagged under summary definitions
+            summary_match = re.findall(r'(?:Total Value|Aggregate Value|Amount/Value)\s*[:]*\s*(\d[\d,]{4,})', ais_text, re.IGNORECASE)
+            if summary_match:
+                for match in summary_match[:2]: # Grab primary key components
+                    val = float(match.replace(',', ''))
+                    detected_high_value_investments += val
+                    ais_signatures_found.append(f"Aggregate AIS Financial Signal: ₹{val:,}")
+
+        return round(detected_high_value_investments, 2), ais_signatures_found
+    except Exception as e:
+        st.error(f"AIS Extraction Pipeline Failure: {str(e)}")
+        return 0.0, []
+
+
+# --- CORE STATUTORY MATHEMATICAL MODEL ---
 def compute_progressive_tax_2026(taxable_profit):
     if taxable_profit <= 0:
         return 0.0, 0.0, 0.0
@@ -108,164 +166,123 @@ def compute_progressive_tax_2026(taxable_profit):
 
 
 # =====================================================================
-# ENTERPRISE B2B AUTHENTICATION GATEWAY
+# ENTERPRISE GATEWAY AUTHORIZATION AUTH
 # =====================================================================
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
-if "node_user" not in st.session_state:
-    st.session_state["node_user"] = ""
-if "enterprise_name" not in st.session_state:
-    st.session_state["enterprise_name"] = ""
-if "partner_tier" not in st.session_state:
-    st.session_state["partner_tier"] = ""
 
 if not st.session_state["authenticated"]:
     st.title("🔒 Kulkarni Strategic Partners | Secure Node Login")
-    st.caption("Enterprise B2B Decentralized Authorization Console")
-    
     col_login, _ = st.columns([1.2, 2])
     with col_login:
-        input_user = st.text_input("Node Username / Operator Token", value="admin_shashank")
-        input_pass = st.text_input("Node Security Key / Password", type="password", value="shashank123")
-        
+        input_user = st.text_input("Node Username", value="admin_shashank")
+        input_pass = st.text_input("Node Security Key", type="password", value="shashank123")
         if st.button("Authorize Node Connection", use_container_width=True):
             if input_user == "admin_shashank" and input_pass == "shashank123":
                 st.session_state["authenticated"] = True
                 st.session_state["node_user"] = "admin_shashank"
-                st.session_state["enterprise_name"] = "KULKARNI STRATEGIC PARTNERS"
-                st.session_state["partner_tier"] = "👑 Elite Partner Tier"
                 st.rerun()
     st.stop()
 
 
 # =====================================================================
-# SIDEBAR NAVIGATION INTERFACE
+# CORE WORKSPACE & WORKFLOW ENGINE
 # =====================================================================
-st.sidebar.markdown(f"🟢 **Node:** `{st.session_state['node_user']}`")
-st.sidebar.markdown(f"🏢 **Enterprise:** `{st.session_state['enterprise_name']}`")
-
-if st.sidebar.button("🧹 Clear All Session Cache & Slate", use_container_width=True):
+st.sidebar.markdown(f"🟢 **Active Node User:** `{st.session_state['node_user']}`")
+if st.sidebar.button("🧹 Wipe Session Data Core", use_container_width=True):
     st.session_state.clear()
-    st.toast("Wiped local memory stacks completely clean.", icon="🗑️")
     st.rerun()
 
-st.sidebar.markdown("---")
-selected_module = st.sidebar.radio("Select Platform Track to Execute:", ["🚀 Module 1: Smart ITR Filing Engine"])
+st.header("🚀 Universal Smart ITR Filing & AIS Cross-Reconciliation Core")
+st.caption("Filing Engine Core | Multi-Bank Schema Adaptive Engine | Income Tax Act, 1961 Compliance Framework")
 
-# =====================================================================
-# FILING ENGINE REAL DATA PIPELINE
-# =====================================================================
-if selected_module == "🚀 Module 1: Smart ITR Filing Engine":
-    st.header("🚀 Module 1: Smart ITR Filing Engine (Surgical Precision Core)")
-    st.caption("Filing Engine Core | Statutory Alignment: Income Tax Act, 1961")
+panel_left, panel_right = st.columns([1, 1])
+
+extracted_turnover = 0.0
+extracted_ais_investments = 0.0
+client_name = "Not Identified"
+ais_logs = []
+
+with panel_left:
+    st.subheader("📥 Data Ingestion Hub")
     
-    panel_left, panel_right = st.columns([1, 1])
-    
-    extracted_turnover = 0.0
-    client_name = "Not Identified"
-    
-    with panel_left:
-        st.subheader("📥 Data Ingestion Hub")
-        uploaded_statement = st.file_uploader("Upload Bank Statement (PDF ONLY)", type=["pdf"])
+    # 1. Multi-Bank Universal File Drop
+    uploaded_statement = st.file_uploader("Upload Client Bank Statement (Supports HDFC, ICICI, SBI, UBI, etc.)", type=["pdf"], key="bank_file")
+    if uploaded_statement:
+        extracted_turnover, client_name = parse_universal_bank_statement(uploaded_statement)
+        st.success(f"🔗 Bank Matrix Synced! Profile Identity: **{client_name}**")
+        st.metric(label="Isolated Real Ledger Deposits", value=f"₹{extracted_turnover:,}")
         
-        if uploaded_statement is not None:
-            extracted_turnover, client_name = parse_live_bank_statement(uploaded_statement)
-            if extracted_turnover > 0:
-                st.success(f"🔗 OCR Match Found! Client Identified: **{client_name}**")
+    st.markdown("---")
+    
+    # 2. Automated AIS Document Drop
+    uploaded_ais = st.file_uploader("Upload Client Annual Information Statement (AIS) PDF", type=["pdf"], key="ais_file")
+    if uploaded_ais:
+        extracted_ais_investments, ais_logs = parse_income_tax_ais(uploaded_ais)
+        st.info("📑 AIS Intelligence Vector Calculated!")
+        st.metric(label="Identified AIS Asset Investments", value=f"₹{extracted_ais_investments:,}")
+        for log in ais_logs:
+            st.caption(f"📍 {log}")
+
+    st.markdown("---")
+    st.subheader("⚙️ Adjusted Data Control Panel")
+    final_inflow = st.number_input("Verified Gross Turnovers (INR)", min_value=0.0, value=float(extracted_turnover))
+    final_ais_val = st.number_input("High Value AIS Footprints Added (INR)", min_value=0.0, value=float(extracted_ais_investments))
+
+with panel_right:
+    st.subheader("🤖 Smart Compliance Agent Pipeline Matrix")
+    
+    if final_inflow == 0.0:
+        st.info("👋 **Waiting for Ingestion:** Upload files into the Data Ingestion Hub to spin up calculations.")
+    else:
+        # Agent 1: Selecting the route
+        with st.expander("🔹 Agent 1: Statutory Route Optimizer", expanded=True):
+            if final_inflow <= 7500000:
+                net_profit = final_inflow * 0.50
+                route_tag = "Section 44ADA (Professional Presumptive)"
             else:
-                st.warning("⚠️ Text processing executed: Detected no business credit transactions on this layout.")
-        
-        final_inflow = st.number_input("Gross Account Inflows Verified (INR)", min_value=0.0, value=float(extracted_turnover), step=5000.0)
-        cash_ratio = st.slider("Cash Component Ratio (%)", min_value=0, max_value=100, value=0)
-        ais_input_val = st.number_input("Enter Actual AIS High Value Investment Figure (INR)", min_value=0.0, value=0.0, step=5000.0)
+                net_profit = final_inflow * 0.06
+                route_tag = "Section 44AD (Business Presumptive)"
+            st.info(f"Filing Path Alignment: **{route_tag}**")
+            st.write(f"Taxable Presumptive Profit: **₹{net_profit:,}**")
 
-    with panel_right:
-        st.subheader("🤖 Real-Time Agent Matrix Pipeline")
-        
-        if final_inflow == 0.0:
-            st.info("👋 **System Idle Baseline:** Please drop a valid ledger PDF. No mock numbers are active.")
-            route_tag, net_profit, slab_tax, rebate_87a, total_tax, risk_status, risk_notes, variance_amt = "N/A", 0, 0, 0, 0, "Clean", "No active data", 0
-        else:
-            with st.expander("🔹 Agent 1: Banking Ledger Vectorizer", expanded=True):
-                st.write(f"Account Legal Identity Holder: **{client_name}**")
-                st.write(f"Verified gross receipts isolated from raw text strings: **₹{final_inflow:,}**")
-                
-            with st.expander("🔹 Agent 2: Statutory Route Optimizer", expanded=True):
-                if final_inflow <= 7500000:
-                    net_profit = final_inflow * 0.50
-                    route_tag = "Section 44ADA"
-                else:
-                    net_profit = final_inflow * 0.06
-                    route_tag = "Section 44AD"
-                st.info(f"✅ Route Selected: **{route_tag}**.")
-                st.write(f"Calculated Taxable Presumptive Net Profit: **₹{net_profit:,}**")
+        # Agent 2: Computing taxes
+        with st.expander("🔹 Agent 2: Tax Calculation Matrix", expanded=True):
+            slab_tax, rebate_87a, total_tax = compute_progressive_tax_2026(net_profit)
+            st.metric(label="Net System Tax Demand Liability", value=f"₹{total_tax:,}")
+            
+            breakdown_df = pd.DataFrame({
+                "Tax Parameter Slabs": ["Calculated Gross Tax", "Sec 87A Rebate Absorbed", "Final Portal Balance Due"],
+                "Amount (INR)": [f"₹{slab_tax:,}", f"₹{rebate_87a:,}", f"₹{total_tax:,}"]
+            })
+            st.table(breakdown_df)
 
-            with st.expander("🔹 Agent 3: Tax Computation Core", expanded=True):
-                slab_tax, rebate_87a, total_tax = compute_progressive_tax_2026(net_profit)
-                st.metric(label="Calculated Net Tax Demand (Inc. Cess)", value=f"₹{total_tax:,}")
-                
-                breakdown_df = pd.DataFrame({
-                    "Matrix Component Vector": ["Calculated Slab Liability", "Section 87A Rebate Absorbed", "Final Portal Balance"],
-                    "Amount (INR)": [f"₹{slab_tax:,}", f"₹{rebate_87a:,}", f"₹{total_tax:,}"]
-                })
-                st.table(breakdown_df)
+        # Agent 3: Smart Risk Mitigation Engine
+        with st.expander("⚠️ Agent 3: System Risk Auditing & AIS Reconciliation", expanded=True):
+            if final_ais_val > net_profit:
+                variance = final_ais_val - net_profit
+                st.error("🚨 HIGH DISCREPANCY MISMATCH")
+                st.write(f"The client invested **₹{final_ais_val:,}** in high-value assets according to the AIS. However, their declared net income is only **₹{net_profit:,}**.")
+                st.warning(f"⚠️ Unexplained Gap: **₹{variance:,}**. Filing now will highly trigger an IT Department scrutiny notice under section 143(1) / 148.")
+            else:
+                st.success("✅ Risk analysis cleared. High-value investments line up completely with the declared business earnings safely.")
 
-            with st.expander("⚠️ Agent 4: Risk Mitigation & AIS Reconciliation", expanded=True):
-                variance_amt = max(0.0, ais_input_val - net_profit)
-                if ais_input_val > net_profit:
-                    risk_status = "High Risk Mismatch"
-                    risk_notes = f"Asset investments of ₹{ais_input_val:,} exceed presumptive corridors by ₹{variance_amt:,}."
-                    st.error("🚨 CRITICAL DISCREPANCY DETECTED")
-                else:
-                    risk_status = "Clean Pass"
-                    risk_notes = "All listed transactions flow inside regular presumptive net profit bounds safely."
-                    st.success("✅ Risk analysis metrics cleared.")
-
-    # --- NATIVE DYNAMIC REPORT MANIFEST ENGINE ---
-    if final_inflow > 0.0:
-        st.markdown("---")
-        st.subheader("📄 Module 1: Comprehensive Step-by-Step Filing & Compliance Report Generator")
-        
-        report_html = f"""
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; padding: 25px; line-height: 1.6; color: #1E293B; }}
-                .header {{ border-bottom: 4px solid #1E3A8A; padding-bottom: 12px; margin-bottom: 25px; }}
-                .title {{ font-size: 26px; font-weight: bold; color: #1E3A8A; }}
-                .meta {{ font-size: 13px; color: #475569; margin-bottom: 25px; background: #F1F5F9; padding: 12px; border-radius: 6px; }}
-                .section {{ margin-bottom: 30px; padding: 20px; background: #F8FAFC; border-left: 5px solid #3B82F6; border-radius: 4px; }}
-                table {{ width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 14px; }}
-                th, td {{ padding: 12px; border: 1px solid #CBD5E1; text-align: left; }}
-                th {{ background: #E2E8F0; color: #0F172A; font-weight: bold; }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <div class="title">OFFICIAL TAX COMPLIANCE REPORT MANIFEST</div>
-            </div>
-            <div class="meta">
-                <strong>Assessed Client Identity Name:</strong> {client_name}<br>
-                <strong>Authorized Node User:</strong> {st.session_state["node_user"]}<br>
-            </div>
-            <div class="section">
-                <h3>📊 Real Dynamic Financial Summary Matrix</h3>
-                <table>
-                    <tr><th>Audited Component Field</th><th>Computed Value Baseline</th></tr>
-                    <tr><td>Filing Route Framework</td><td><strong>{route_tag}</strong></td></tr>
-                    <tr><td>Actual Extracted Bank Ledger Inflows</td><td>INR {final_inflow:,}</td></tr>
-                    <tr><td>Computed Net Business Profits</td><td>INR {net_profit:,}</td></tr>
-                    <tr><td><strong>Final Portal Net Payable Tax Demand</strong></td><td><strong>INR {total_tax:,}</strong></td></tr>
-                </table>
-            </div>
-        </body>
-        </html>
-        """
-        st.components.v1.html(report_html, height=400, scrolling=True)
-        st.download_button(
-            label="📥 Download Real Compliance Blueprint Manifest",
-            data=report_html,
-            file_name=f"Verified_Filing_Blueprint_{client_name.replace(' ', '_')}.html",
-            mime="text/html",
-            use_container_width=True
-        )
+# --- MANIFEST PRODUCTION OUTPUT ---
+if final_inflow > 0.0:
+    st.markdown("---")
+    report_html = f"""
+    <html>
+    <head><style>body {{ font-family: sans-serif; padding: 20px; }} .box {{ background: #F8FAFC; border-left: 5px solid #1E3A8A; padding: 15px; }}</style></head>
+    <body>
+        <h2>OFFICIAL RECONCILIATION SUMMARY REPORT</h2>
+        <div class="box">
+            <strong>Client Name:</strong> {client_name}<br>
+            <strong>Total Calculated Bank Deposits:</strong> ₹{final_inflow:,}<br>
+            <strong>Total Traced Asset Footprints (AIS):</strong> ₹{final_ais_val:,}<br>
+            <strong>Assigned Path:</strong> {route_tag}<br>
+            <strong>Tax Payable Demand:</strong> ₹{total_tax:,}
+        </div>
+    </body>
+    </html>
+    """
+    st.download_button("📥 Download Finalized Filing Manifest Blueprint", data=report_html, file_name="Filing_Manifest.html", mime="text/html", use_container_width=True)
