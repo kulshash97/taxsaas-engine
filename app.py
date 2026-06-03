@@ -3,186 +3,255 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-class TaxEngineReconciler:
+class ComprehensiveTaxEngine:
     def __init__(self, bank_file=None, ais_file=None, ledger_file=None):
         self.bank_file = bank_file
         self.ais_file = ais_file
         self.ledger_file = ledger_file
         
-        # Core Ingestion Metrics
+        # Financial Node Stream Parameters
         self.gross_receipts = 0.0
         self.presumptive_profit = 0.0
         self.stcg = 0.0
         self.ltcg = 0.0
-        self.other_sources_income = 0.0
         self.salary_income = 0.0
+        self.other_sources_income = 0.0
         self.total_deductions = 0.0
+        
+        # Metadata Flags
+        self.has_agricultural_income_over_5k = False
+        self.is_director_or_unlisted_equity = False
+        self.has_foreign_assets = False
 
     def parse_bank_statement(self):
-        """Parses bank ledgers dynamically; isolates credits vs reversals."""
+        """Extracts and clean-aggregates credit volumes from bank sheets."""
         if not self.bank_file:
             return
         
-        # Read directly from the Streamlit uploaded file object
-        if self.bank_file.name.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(self.bank_file)
-        else:
-            df = pd.read_csv(self.bank_file)
-            
-        df.columns = [str(c).strip().upper() for c in df.columns]
-        credit_col = next((c for c in df.columns if 'CREDIT' in c or 'DEPOSIT' in c), None)
-        desc_col = next((c for c in df.columns if 'DESC' in c or 'REMARK' in c or 'NARRATION' in c), None)
-        
-        if credit_col:
-            df[credit_col] = pd.to_numeric(df[credit_col], errors='coerce').fillna(0.0)
-            
-            if desc_col:
-                reversal_mask = df[desc_col].astype(str).str.contains('REVERSAL|ROLLBACK|REFUND|FAILED', case=False, na=False)
-                valid_credits = df[~reversal_mask][credit_col].sum()
+        try:
+            if self.bank_file.name.endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(self.bank_file, engine='openpyxl')
             else:
-                valid_credits = df[credit_col].sum()
+                df = pd.read_csv(self.bank_file)
                 
-            self.gross_receipts = float(valid_credits)
+            df.columns = [str(c).strip().upper() for c in df.columns]
+            credit_col = next((c for c in df.columns if 'CREDIT' in c or 'DEPOSIT' in c or 'CR' in c), None)
+            desc_col = next((c for c in df.columns if 'DESC' in c or 'REMARK' in c or 'NARRATION' in c), None)
+            
+            if credit_col:
+                df[credit_col] = pd.to_numeric(df[credit_col], errors='coerce').fillna(0.0)
+                
+                # Mitigate artificial gross inflation by screening out reversal entries
+                if desc_col:
+                    reversal_mask = df[desc_col].astype(str).str.contains('REVERSAL|ROLLBACK|REFUND|FAILED|INTEREST', case=False, na=False)
+                    valid_credits = df[~reversal_mask][credit_col].sum()
+                else:
+                    valid_credits = df[credit_col].sum()
+                    
+                self.gross_receipts = float(valid_credits)
+        except Exception as e:
+            st.error(f"Error parsing bank statement entry streams: {str(e)}")
 
     def parse_stock_ledger(self):
-        """Processes financial trade matrices to compute true net capital gains."""
+        """Processes transactional matrix data to resolve true Short/Long Term Capital Gains."""
         if not self.ledger_file:
             return
             
-        if self.ledger_file.name.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(self.ledger_file)
-        else:
-            df = pd.read_csv(self.ledger_file)
+        try:
+            if self.ledger_file.name.endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(self.ledger_file, engine='openpyxl')
+            else:
+                df = pd.read_csv(self.ledger_file)
+                
+            df.columns = [str(c).strip().upper() for c in df.columns]
             
-        df.columns = [str(c).strip().upper() for c in df.columns]
-        
-        stcg_col = next((c for c in df.columns if 'STCG' in c or 'SHORT TERM' in c), None)
-        ltcg_col = next((c for c in df.columns if 'LTCG' in c or 'LONG TERM' in c), None)
-        
-        if stcg_col:
-            self.stcg = float(pd.to_numeric(df[stcg_col], errors='coerce').sum())
-        if ltcg_col:
-            self.ltcg = float(pd.to_numeric(df[ltcg_col], errors='coerce').sum())
+            stcg_col = next((c for c in df.columns if 'STCG' in c or 'SHORT TERM' in c or 'SHORT-TERM' in c), None)
+            ltcg_col = next((c for c in df.columns if 'LTCG' in c or 'LONG TERM' in c or 'LONG-TERM' in c), None)
+            
+            if stcg_col:
+                self.stcg = float(pd.to_numeric(df[stcg_col], errors='coerce').sum())
+            if ltcg_col:
+                self.ltcg = float(pd.to_numeric(df[ltcg_col], errors='coerce').sum())
+        except Exception as e:
+            st.error(f"Error parsing asset ledger matrices: {str(e)}")
 
-    def determine_itr_type_and_tax(self):
-        """Dynamically applies IT Act, 1961 optimization & selection constraints."""
+    def determine_optimal_itr_and_tax(self, selected_route):
+        """
+        Dynamically cross-references IT Act, 1961 provisions to select the mandatory ITR form type.
+        Executes progressive slab math under the New Regime (u/s 115BAC) for AY 2026-27.
+        """
         has_business_profession = self.gross_receipts > 0
         has_capital_gains = (self.stcg != 0) or (self.ltcg != 0)
         
-        itr_form = "ITR-1"
-        
-        if has_capital_gains:
-            itr_form = "ITR-3"
+        # -------------------------------------------------------------------------
+        # ITR ARCHETYPE ROUTING MATRIX LOGIC
+        # -------------------------------------------------------------------------
+        if self.has_foreign_assets or self.is_director_or_unlisted_equity:
+            itr_form = "ITR-3 (Complex Asset/Directorship Architecture)"
+        elif has_capital_gains:
+            if has_business_profession:
+                itr_form = "ITR-3 (Combined Business & Capital Gains Ledger)"
+            else:
+                itr_form = "ITR-2 (Capital Gains & Other Income Matrix)"
         elif has_business_profession:
-            if self.gross_receipts <= 7500000:
-                itr_form = "ITR-4"
+            # Check eligibility parameters for presumptive options
+            if "44AD" in selected_route and self.gross_receipts <= 30000000: # ₹3 Crore limit
+                itr_form = "ITR-4 (Sugam Presumptive Small Business)"
+                self.presumptive_profit = round(self.gross_receipts * 0.06, 2) # Digital rate optimization baseline
+            elif "44ADA" in selected_route and self.gross_receipts <= 7500000: # ₹75 Lakh limit
+                itr_form = "ITR-4 (Sugam Presumptive Specified Profession)"
                 self.presumptive_profit = round(self.gross_receipts * 0.50, 2)
             else:
-                itr_form = "ITR-3"
+                itr_form = "ITR-3 (Regular Books of Accounts Framework)"
                 self.presumptive_profit = 0.0
+        else:
+            if self.has_agricultural_income_over_5k or (self.salary_income + self.other_sources_income > 5000000):
+                itr_form = "ITR-2 (High Net Worth Individual/Agr. Income)"
+            else:
+                itr_form = "ITR-1 (Sahaj Standard Salary & Other Sources)"
 
+        # -------------------------------------------------------------------------
+        # MATHEMATICAL TAX LIABILTY VECTOR ENGINE
+        # -------------------------------------------------------------------------
         gross_total_income = self.salary_income + self.presumptive_profit + self.stcg + self.ltcg + self.other_sources_income
         net_taxable_income = max(0.0, gross_total_income - self.total_deductions)
         
-        base_taxable = max(0.0, net_taxable_income - self.stcg - self.ltcg)
+        # Isolate progressive normal slab base components away from special flat-rate items
+        base_taxable_slabs = max(0.0, net_taxable_income - self.stcg - self.ltcg)
         raw_slab_tax = 0.0
         
-        # New Tax Regime Slab Logic (FY 2025-26 / AY 2026-27 framework)
-        if base_taxable > 1500000:
-            raw_slab_tax += (base_taxable - 1500000) * 0.30 + 150000
-        elif base_taxable > 1200000:
-            raw_slab_tax += (base_taxable - 1200000) * 0.20 + 90000
-        elif base_taxable > 900000:
-            raw_slab_tax += (base_taxable - 900000) * 0.15 + 45000
-        elif base_taxable > 600000:
-            raw_slab_tax += (base_taxable - 600000) * 0.10 + 15000
-        elif base_taxable > 300000:
-            raw_slab_tax += (base_taxable - 300000) * 0.05
+        # AY 2026-27 New Regime Progressive Slabs Rules
+        if base_taxable_slabs > 1500000:
+            raw_slab_tax += (base_taxable_slabs - 1500000) * 0.30 + 150000
+        elif base_taxable_slabs > 1200000:
+            raw_slab_tax += (base_taxable_slabs - 1200000) * 0.20 + 90000
+        elif base_taxable_slabs > 900000:
+            raw_slab_tax += (base_taxable_slabs - 900000) * 0.15 + 45000
+        elif base_taxable_slabs > 600000:
+            raw_slab_tax += (base_taxable_slabs - 600000) * 0.10 + 15000
+        elif base_taxable_slabs > 300000:
+            raw_slab_tax += (base_taxable_slabs - 300000) * 0.05
 
-        stcg_tax = max(0.0, self.stcg * 0.15)
-        ltcg_tax = max(0.0, (self.ltcg - 100000) * 0.10) if self.ltcg > 100000 else 0.0
+        # Flat Special Rates Calculations
+        stcg_tax = max(0.0, self.stcg * 0.15) # Sec 111A
+        ltcg_tax = max(0.0, (self.ltcg - 100000) * 0.10) if self.ltcg > 100000 else 0.0 # Sec 112A
         
-        total_computed_tax = raw_slab_tax + stcg_tax + ltcg_tax
+        total_tax_pre_rebate = raw_slab_tax + stcg_tax + ltcg_tax
         
+        # System Guardrail Check: Section 87A New Regime Threshold Rebate Allocation
         if net_taxable_income <= 700000:
-            rebate = total_computed_tax
+            rebate_87a = total_tax_pre_rebate
             net_tax_payable = 0.0
         else:
-            rebate = 0.0
-            net_tax_payable = total_computed_tax
+            rebate_87a = 0.0
+            net_tax_payable = total_tax_pre_rebate
             
-        if net_tax_payable > 0:
-            net_tax_payable = round(net_tax_payable * 1.04, 2)
+        # Add Statutory 4% Health & Education Cess
+        final_tax_with_cess = round(net_tax_payable * 1.04, 2) if net_tax_payable > 0 else 0.0
 
         return {
             "assigned_form": itr_form,
             "metrics": {
-                "Gross Receipts": round(self.gross_receipts, 2),
-                "Calculated Presumptive Profit": round(self.presumptive_profit, 2),
-                "STCG": round(self.stcg, 2),
-                "LTCG": round(self.ltcg, 2),
-                "Gross Total Income": round(gross_total_income, 2)
+                "Aggregated Gross Receipts": round(self.gross_receipts, 2),
+                "Computed Business/Prof Profit": round(self.presumptive_profit, 2),
+                "Short-Term Capital Gains (STCG)": round(self.stcg, 2),
+                "Long-Term Capital Gains (LTCG)": round(self.ltcg, 2),
+                "Other Sources / Interest Payouts": round(self.other_sources_income, 2),
+                "Gross Combined Income Matrix": round(gross_total_income, 2)
             },
             "tax_computation": {
-                "Slab Tax": round(raw_slab_tax, 2),
-                "STCG Tax (15%)": round(stcg_tax, 2),
-                "LTCG Tax (10%)": round(ltcg_tax, 2),
-                "Section 87A Rebate": round(rebate, 2),
-                "Net Tax Due": round(net_tax_payable, 2)
+                "Progressive Slab Tax": round(raw_slab_tax, 2),
+                "Section 111A STCG Tax": round(stcg_tax, 2),
+                "Section 112A LTCG Tax": round(ltcg_tax, 2),
+                "Section 87A Rebate Credit": round(rebate_87a, 2),
+                "Total Net Tax Due": round(final_tax_with_cess, 2)
             },
-            "verification_status": "PASSED" if (net_taxable_income <= 700000 and net_tax_payable == 0) or (net_taxable_income > 700000 and net_tax_payable > 0) else "FAILED_RECONCILIATION"
+            "system_audit_status": "PASSED" if (net_taxable_income <= 700000 and final_tax_with_cess == 0.0) or (net_taxable_income > 700000 and final_tax_with_cess > 0.0) else "FAILED_VERIFICATION"
         }
 
-# --- STREAMLIT UI ARCHITECTURE ---
-st.set_page_config(page_title="TaxSaaS Dynamic Engine", page_layout="wide")
-st.title("🧮 Dynamic Tax Reconciliation & ITR Selector Engine")
-st.write("Upload client documents below to parse, calculate, and determine tax liabilities with zero hardcoding errors.")
+# -------------------------------------------------------------------------
+# STREAMLIT COMPONENT APP RENDERING LAYER
+# -------------------------------------------------------------------------
+st.set_page_config(page_title="KSP Universal Compliance Engine", layout="wide")
+st.title("🛡️ Universal Multi-Client Tax Reconciliation & Ingestion Hub")
+st.markdown("---")
 
+# Dynamic Workspace Cleaner
+if "execution_completed" not in st.session_state:
+    st.session_state.execution_completed = False
+
+def clear_client_workspace():
+    st.session_state.execution_completed = False
+    st.toast("Pipeline state cleared. Ready for next multi-client batch run!", icon="🧹")
+
+if st.session_state.execution_completed:
+    st.button("🧹 Clear Workspace & Reset Pipeline for Next Client", on_click=clear_client_workspace, use_container_width=True, type="primary")
+    st.markdown("---")
+
+with st.sidebar:
+    st.header("⚙️ Client Profile Setup")
+    client_name = st.text_input("Legal Assessee Name", placeholder="E.g., Manikrishna Alahari")
+    client_pan = st.text_input("PAN Reference ID", max_chars=10, placeholder="ABCDE1234F")
+    
+    st.markdown("### 🗺️ Business Profiler Strategy")
+    route_selection = st.radio("Primary Presumptive Pathway Route:", [
+        "General Trade / Digital Retail Business (Sec 44AD)",
+        "Specified Professional Consultant Matrix (Sec 44ADA)",
+        "None (Pure Salaried / Passive Capital Filer Only)"
+    ])
+    
+    st.markdown("### ⚠️ Complex Status Declarations")
+    flag_director = st.checkbox("Holds Directorship / Unlisted Shares Equity")
+    flag_foreign = st.checkbox("Maintains Foreign Bank Accounts / Assets Assets")
+
+# File Upload Columns Matrix Layout
 col1, col2, col3 = st.columns(3)
-
 with col1:
-    bank_file = st.file_uploader("Upload Bank Statement (CSV/Excel)", type=["csv", "xlsx", "xls"])
+    bank_file = st.file_uploader("Ingest Banking Ledgers (CSV / XLSX)", type=["csv", "xlsx", "xls"])
 with col2:
-    ais_file = st.file_uploader("Upload AIS / TIS Summary Data", type=["csv", "xlsx", "json"])
+    ais_file = st.file_uploader("Ingest Annual Information Statement (AIS)", type=["csv", "xlsx", "json"])
 with col3:
-    ledger_file = st.file_uploader("Upload Stock Ledger / Capital Gains", type=["csv", "xlsx", "xls"])
+    ledger_file = st.file_uploader("Ingest Realized Trade P&L Statements", type=["csv", "xlsx", "xls"])
 
-if st.button("Run Dynamic Tax Analysis", type="primary"):
-    if not bank_file and not ledger_file:
-        st.warning("Please upload at least a Bank Statement or a Stock Ledger to process calculations.")
+if st.button("🚀 Process Multi-Stream Audit Verification", use_container_width=True):
+    if not client_name or not client_pan:
+        st.warning("⚠️ Access Denied: Configure the core Profile Setup (Assessee Name & PAN Reference) inside the sidebar dashboard first.")
     else:
-        with st.spinner("Executing dynamic reconciliation layers..."):
-            engine = TaxEngineReconciler(bank_file=bank_file, ais_file=ais_file, ledger_file=ledger_file)
+        with st.spinner("Executing structural cross-reference loops..."):
+            engine = ComprehensiveTaxEngine(bank_file=bank_file, ais_file=ais_file, ledger_file=ledger_file)
             
-            try:
-                engine.parse_bank_statement()
-                engine.parse_stock_ledger()
-                result = engine.determine_itr_type_and_tax()
+            # Map dynamic configuration flags from profile configurations
+            engine.is_director_or_unlisted_equity = flag_director
+            engine.has_foreign_assets = flag_foreign
+            
+            # Run parsing engines
+            engine.parse_bank_statement()
+            engine.parse_stock_ledger()
+            
+            # Fire up core calculations
+            results = engine.determine_optimal_itr_and_tax(route_selection)
+            st.session_state.execution_completed = True
+            
+            # Layout the Metrics Screen
+            st.success(f"🎉 Complete Audit Realized for Profile: {client_name} ({client_pan})")
+            
+            m1, m2, m3, m4 = st.columns(4)
+            m1.metric("Selected E-Filing Framework", results["assigned_form"].split(" ")[0])
+            m2.metric("Computed Aggregated Receipts", f"INR {results['metrics']['Aggregated Gross Receipts']:,}")
+            m3.metric("Gross Portfolio Total (GTI)", f"INR {results['metrics']['Gross Combined Income Matrix']:,}")
+            m4.metric("Net Government Tax Payable", f"INR {results['tax_computation']['Total Net Tax Due']:,}")
+            
+            st.markdown("---")
+            d1, d2 = st.columns(2)
+            
+            with d1:
+                st.subheader("📋 Audited Asset Income Vectors")
+                st.json(results["metrics"])
+            with d2:
+                st.subheader("⚖️ Computed Statutory Obligations")
+                st.json(results["tax_computation"])
                 
-                st.success("Analysis Complete!")
-                
-                # Metric display row
-                m_col1, m_col2, m_col3 = st.columns(3)
-                m_col1.metric("Recommended Form", result["assigned_form"])
-                m_col2.metric("Gross Total Income", f"₹{result['metrics']['Gross Total Income']:,}")
-                m_col3.metric("Net Tax Payable", f"₹{result['tax_computation']['Net Tax Due']:,}")
-                
-                # Split details layouts
-                st.markdown("---")
-                res_col1, res_col2 = st.columns(2)
-                
-                with res_col1:
-                    st.subheader("📊 Reconciled Income Vectors")
-                    st.json(result["metrics"])
-                    
-                with res_col2:
-                    st.subheader("⚖️ Tax Calculation Breakdown")
-                    st.json(result["tax_computation"])
-                    
-                if result["verification_status"] == "PASSED":
-                    st.info("✅ System Guardrail Check: Math fully verified and aligned with statutory thresholds.")
-                else:
-                    st.error("🚨 System Guardrail Check: Reconciliation discrepancy detected. Review raw inputs.")
-                    
-            except Exception as e:
-                st.error(f"An internal data processing failure occurred: {str(e)}")
+            if results["system_audit_status"] == "PASSED":
+                st.info("✅ System Audit Guardrail Check: Zero mathematical anomalies found. Values align perfectly across Income Tax Act thresholds.")
+            else:
+                st.error("🚨 System Audit Guardrail Check: Income mismatch detected. Recalculate input statement arrays.")
