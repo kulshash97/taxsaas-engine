@@ -157,31 +157,35 @@ def compute_tax_liability(business_turnover, presumptive_rate, stcg_profit):
 # -------------------------------------------------------------------------
 # REPORTLAB PDF GENERATION HUBS
 # -------------------------------------------------------------------------
-def generate_pdf_report(client_name, pan_ucc, tax_m, stock_m, route, itr_form):
+def generate_pdf_report(client_name, pan_ucc, tax_m, stock_m, route, itr_form, turnover):
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
+    # Margins kept tight to cleanly prevent unnecessary blank sheets
+    doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=35, bottomMargin=35)
     story = []
     
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#0F172A'), spaceAfter=5)
-    section_style = ParagraphStyle('SecTitle', parent=styles['Heading2'], fontSize=12, textColor=colors.HexColor('#1E3A8A'), spaceBefore=12, spaceAfter=8)
+    title_style = ParagraphStyle('DocTitle', parent=styles['Heading1'], fontSize=18, textColor=colors.HexColor('#0F172A'), spaceAfter=3)
+    section_style = ParagraphStyle('SecTitle', parent=styles['Heading2'], fontSize=11, textColor=colors.HexColor('#1E3A8A'), spaceBefore=10, spaceAfter=6)
     body_style = ParagraphStyle('BodyTextCustom', parent=styles['Normal'], fontSize=9, leading=13, textColor=colors.HexColor('#334155'))
     bold_body = ParagraphStyle('BodyBoldCustom', parent=body_style, fontName='Helvetica-Bold')
+    instruction_style = ParagraphStyle('InsStyle', parent=body_style, fontSize=8.5, leading=12.5, spaceAfter=4)
 
     story.append(Paragraph("<b>KULKARNI STRATEGIC PARTNERS (KSP)</b>", title_style))
     story.append(Paragraph("Certified Financial Compliance & Cross-Reference Audit Packet", body_style))
-    story.append(Spacer(1, 10))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1E3A8A'), spaceAfter=12))
+    story.append(Spacer(1, 6))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#1E3A8A'), spaceAfter=10))
     
+    # Metadata Table Block
     meta_data = [
         [Paragraph("<b>Assessee Legal Name:</b>", body_style), Paragraph(str(client_name), body_style), Paragraph("<b>Assessment Year:</b>", body_style), Paragraph("2026-27 (FY 2025-26)", body_style)],
-        [Paragraph("<b>PAN / UCC Reference:</b>", body_style), Paragraph(str(pan_ucc), body_style), Paragraph("<b>Prescribed Form:</b>", bold_body), Paragraph(f"<b>{itr_form}</b>", bold_body)],
+        [Paragraph("<b>PAN / UCC Reference:</b>", body_style), Paragraph(str(pan_ucc), body_style), Paragraph("<b>Prescribed Form:</b>", bold_body), Paragraph(f"<b>{itr_form.split(' ')[0]}</b>", bold_body)],
         [Paragraph("<b>Filing Tax Regime:</b>", body_style), Paragraph("New Regime u/s 115BAC", body_style), Paragraph("<b>Pathway Strategy:</b>", body_style), Paragraph(str(route), body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[120, 150, 120, 140])
-    t_meta.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')), ('PADDING', (0,0), (-1,-1), 5), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))]))
+    t_meta.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')), ('PADDING', (0,0), (-1,-1), 4), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))]))
     story.append(t_meta)
     
+    # I. Executive Table Block
     story.append(Paragraph("I. Executive Compliance Breakdown Summary", section_style))
     breakdown_rows = [
         [Paragraph("<b>Financial Node Description</b>", bold_body), Paragraph("<b>Audited Value Matrix (INR)</b>", bold_body)],
@@ -194,9 +198,30 @@ def generate_pdf_report(client_name, pan_ucc, tax_m, stock_m, route, itr_form):
         [Paragraph("<b>Net Total Tax Due and Payable</b>", bold_body), f"<b>₹ {tax_m['final_tax']:,.2f}</b>"]
     ]
     t_break = Table(breakdown_rows, colWidths=[350, 180])
-    t_break.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')), ('PADDING', (0,0), (-1,-1), 5), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')), ('BACKGROUND', (0,6), (-1,6), colors.HexColor('#DCFCE7'))]))
+    t_break.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')), ('PADDING', (0,0), (-1,-1), 4), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')), ('BACKGROUND', (0,6), (-1,6), colors.HexColor('#DCFCE7'))]))
     story.append(t_break)
     
+    # II. Step-by-Step E-Filing Protocols (Appended to Story Stream)
+    story.append(Paragraph("II. Step-by-Step Official Portal E-Filing Protocol Details", section_style))
+    story.append(Paragraph(f"<b>Mandatory Form Route Selection:</b> {itr_form}", bold_body))
+    story.append(Spacer(1, 4))
+    
+    protocols = [
+        f"<b>1. Portal Authentication & Form Selection:</b> Go to <u>incometax.gov.in</u>, log in using legal PAN credentials, and select 'File Income Tax Return'. Choose <b>Assessment Year 2026-27</b> -> Mode: Online -> Status: Individual. Select <b>{itr_form.split(' ')[0]}</b> from the grid matrix. <i>(Note: Even though you are using presumptive rules, you must file this form to report stock short-term capital gains in Schedule CG).</i>",
+        
+        f"<b>2. Schedule BP Configuration (Business & Profession):</b> Open Schedule BP. If using <b>Sec 44AD</b>, input Gross Receipts as <b>₹ {turnover:,.2f}</b> and net Presumptive Profit as <b>₹ {tax_m['normal_income']:,.2f}</b>. If using <b>Sec 44ADA</b>, declare gross fees inside the professional metrics panel.",
+        
+        f"<b>3. Schedule CG Overrides (Capital Gains):</b> Under Capital Gains, check the tick box for 'Equity shares/units of equity oriented MF liable to STT u/s 111A'. Open details and input audited values to override raw split gaps: <br/>&nbsp;&nbsp;&bull; <b>Full Value of Consideration (Total Sales):</b> ₹ {stock_m['stcg_sales']:,.2f}<br/>&nbsp;&nbsp;&bull; <b>Cost of Acquisition (Adjusted Purchases):</b> ₹ {stock_m['stcg_cost']:,.2f}<br/>&nbsp;&nbsp;&bull; <b>Expenditure wholly connected with transfer:</b> ₹ {stock_m['total_charges'] - 810.0:,.2f} <i>(Excluding STT as per Section 48 rules).</i>",
+        
+        f"<b>4. Quarterly Capital Gains Mapping:</b> Scroll down to the bottom of Schedule CG to locate the <i>'Information about accrual/receipt of Capital Gains'</i> grid. Distribute the net capital gains profit (<b>₹ {stock_m['rectified_realized_pnl']:,.2f}</b>) across the matching quarterly brackets using actual sale transaction dates to align with the government's auto-validation rules.",
+        
+        f"<b>5. Final Verification & Zero-Tax Rebate Rules:</b> Proceed to the calculation review screen. Verify that the **Section 87A Rebate** automatically scales across both schedules because your absolute Gross Total Income (<b>₹ {tax_m['gross_total_income']:,.2f}</b>) sits comfortably below the expanded <b>₹ 12,0,000 threshold</b> of the New Tax Regime. Confirm **Net Tax Payable Due** reads exactly <b>₹ 0.00</b>, advance to verification, and execute your submission using Aadhaar OTP parameters securely."
+    ]
+    
+    for note in protocols:
+        story.append(Paragraph(note, instruction_style))
+        story.append(Spacer(1, 2))
+        
     doc.build(story)
     buffer.seek(0)
     return buffer.getvalue()
@@ -251,15 +276,11 @@ if st.button("🚀 Execute Comprehensive Compliance Audit", use_container_width=
             
     tax_metrics = compute_tax_liability(computed_turnover, input_rate, stock_metrics["rectified_realized_pnl"])
     
-    # Dynamic ITR Form Rule Router Logic Check
-    # If the client has equity transactions or capital gains (Schedule CG), they CANNOT file ITR-4. 
-    # They are legally forced to upscale to an ITR-2 or ITR-3 layout profile.
     if stock_metrics["rectified_realized_pnl"] != 0:
         prescribed_itr = "ITR-2 (Capital Gains + Presumptive Combination Structure)"
     else:
         prescribed_itr = "ITR-4 (Sugam Pure Presumptive Base)"
         
-    # Store calculations in session state so they persist during clicks
     st.session_state.audit_results = {
         "tax_m": tax_metrics,
         "stock_m": stock_metrics,
@@ -267,11 +288,13 @@ if st.button("🚀 Execute Comprehensive Compliance Audit", use_container_width=
         "turnover": computed_turnover
     }
     
-    # Pre-compile the PDF file binary array payload
-    st.session_state.pdf_payload = generate_pdf_report(input_name, input_id, tax_metrics, stock_metrics, route, prescribed_itr)
+    # Passing computed_turnover directly to structural formatting array maps
+    st.session_state.pdf_payload = generate_pdf_report(
+        input_name, input_id, tax_metrics, stock_metrics, route, prescribed_itr, computed_turnover
+    )
 
 # -------------------------------------------------------------------------
-# PERSISTENT UI RENDERING LAYER (OUTSIDE OF BUTTON CRASH LOOP)
+# PERSISTENT UI RENDERING LAYER
 # -------------------------------------------------------------------------
 if st.session_state.audit_results is not None:
     res = st.session_state.audit_results
@@ -314,7 +337,6 @@ if st.session_state.audit_results is not None:
         })
         st.table(breakdown_df)
         
-        # Working, crash-proof PDF Download button powered by system state cache layers
         st.download_button(
             label=f"📥 Download Certified Compliance PDF for {input_name}",
             data=st.session_state.pdf_payload,
@@ -326,13 +348,12 @@ if st.session_state.audit_results is not None:
     with d_col2:
         st.markdown(f"### 🛠️ Step-by-Step E-Filing Protocol Details")
         st.info(f"📋 **Mandatory Regulatory Form Path Selection:** **{res['itr']}**")
-        
         st.markdown(f"""
         Follow these exact instructions on the official income tax portal to file this audited result:
         
         1. **Portal Authentication & Selection:**
            * Go to `incometax.gov.in`, authenticate via PAN credentials, and navigate to **File Income Tax Return**.
-           * Select **Assessment Year 2026-27** -> Mode of Filing: **Online** -> Application Status: **Individual**.
+           * Select **Assessment Year 2026-27** → Mode of Filing: **Online** → Application Status: **Individual**.
            * Select **{res['itr'].split(' ')[0]}** from the form selector matrix. *(Note: Even though you are using presumptive income, you must use this form because your client has stock capital gains in Schedule CG)*.
         
         2. **Configure Schedule BP (Business & Profession):**
