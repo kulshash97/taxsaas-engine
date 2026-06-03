@@ -11,15 +11,21 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
 # -------------------------------------------------------------------------
-# SYSTEM INITIALIZATION & STYLING
+# SYSTEM INITIALIZATION & STATE MANAGEMENT
 # -------------------------------------------------------------------------
 st.set_page_config(page_title="KSP Compliance Engine Pro", layout="wide", initial_sidebar_state="expanded")
 
-# Initialize Session State persistent variables to prevent UI disappearance bugs
+# Initialize Session State persistent variables
 if "audit_results" not in st.session_state:
     st.session_state.audit_results = None
 if "pdf_payload" not in st.session_state:
     st.session_state.pdf_payload = None
+
+# Callback function to wipe screen state entirely for the next client upload
+def reset_system_pipeline():
+    st.session_state.audit_results = None
+    st.session_state.pdf_payload = None
+    st.toast("System cleared! Ready for new client files.", icon="🧹")
 
 # -------------------------------------------------------------------------
 # DATA STREAM PARSING ENGINES
@@ -40,7 +46,7 @@ def extract_text_from_pdf(file_bytes):
 
 def parse_bank_pdf_text(text):
     if not text:
-        return 945348.90  
+        return 0.0  
     total_credits = 0.0
     lines = text.split('\n')
     for line in lines:
@@ -55,7 +61,7 @@ def parse_bank_pdf_text(text):
                     total_credits += val
                 except ValueError:
                     continue
-    return total_credits if total_credits > 0 else 945348.90
+    return total_credits
 
 def parse_stock_ledger(file_bytes, filename):
     try:
@@ -73,7 +79,7 @@ def parse_stock_ledger(file_bytes, filename):
                 break
                 
         if header_row_idx is None:
-            header_row_idx = 24
+            header_row_idx = 0
 
         headers = [str(c).strip().lower() for c in df_clean.iloc[header_row_idx].values]
         df_trades = df_clean.iloc[header_row_idx+1:].copy()
@@ -109,14 +115,14 @@ def parse_stock_ledger(file_bytes, filename):
                 continue
 
         return {
-            "raw_realized_pnl": reported_pnl if reported_pnl != 0 else -123592.52,
-            "rectified_realized_pnl": (total_actual_sales - total_actual_cost) if total_actual_sales > 0 else 59774.73,
-            "total_charges": 1450.11,
-            "stcg_sales": total_actual_sales if total_actual_sales > 0 else 264302.10,
-            "stcg_cost": total_actual_cost if total_actual_cost > 0 else 204527.37
+            "raw_realized_pnl": reported_pnl,
+            "rectified_realized_pnl": (total_actual_sales - total_actual_cost),
+            "total_charges": 0.0,
+            "stcg_sales": total_actual_sales,
+            "stcg_cost": total_actual_cost
         }
     except:
-        return {"raw_realized_pnl": -123592.52, "rectified_realized_pnl": 59774.73, "total_charges": 1450.11, "stcg_sales": 264302.10, "stcg_cost": 204527.37}
+        return {"raw_realized_pnl": 0.0, "rectified_realized_pnl": 0.0, "total_charges": 0.0, "stcg_sales": 0.0, "stcg_cost": 0.0}
 
 def compute_tax_liability(business_turnover, presumptive_rate, stcg_profit):
     normal_income = business_turnover * (presumptive_rate / 100.0)
@@ -176,8 +182,8 @@ def generate_pdf_report(client_name, pan_ucc, tax_m, stock_m, route, itr_form, t
     
     # Metadata Block
     meta_data = [
-        [Paragraph("<b>Assessee Legal Name:</b>", body_style), Paragraph(str(client_name), body_style), Paragraph("<b>Assessment Year:</b>", body_style), Paragraph("2026-27 (FY 2025-26)", body_style)],
-        [Paragraph("<b>PAN / UCC Reference:</b>", body_style), Paragraph(str(pan_ucc), body_style), Paragraph("<b>Prescribed Form:</b>", bold_body), Paragraph(f"<b>{itr_form.split(' ')[0]}</b>", bold_body)],
+        [Paragraph("<b>Assessee Legal Name:</b>", body_style), Paragraph(str(client_name if client_name else "N/A"), body_style), Paragraph("<b>Assessment Year:</b>", body_style), Paragraph("2026-27 (FY 2025-26)", body_style)],
+        [Paragraph("<b>PAN / UCC Reference:</b>", body_style), Paragraph(str(pan_ucc if pan_ucc else "N/A"), body_style), Paragraph("<b>Prescribed Form:</b>", bold_body), Paragraph(f"<b>{itr_form.split(' ')[0]}</b>", bold_body)],
         [Paragraph("<b>Filing Tax Regime:</b>", body_style), Paragraph("New Regime u/s 115BAC", body_style), Paragraph("<b>Pathway Strategy:</b>", body_style), Paragraph(str(route), body_style)]
     ]
     t_meta = Table(meta_data, colWidths=[120, 150, 120, 140])
@@ -208,7 +214,7 @@ def generate_pdf_report(client_name, pan_ucc, tax_m, stock_m, route, itr_form, t
     protocols = [
         f"<b>1. Portal Authentication & Form Selection:</b> Go to <u>incometax.gov.in</u>, log in using legal PAN credentials, and select 'File Income Tax Return'. Choose <b>Assessment Year 2026-27</b> -> Mode: Online -> Status: Individual. Select <b>{itr_form.split(' ')[0]}</b> from the grid matrix. <i>(Note: Even though you are using presumptive rules, you must file this form to report stock short-term capital gains in Schedule CG).</i>",
         f"<b>2. Schedule BP Configuration (Business & Profession):</b> Open Schedule BP. If using <b>Sec 44AD</b>, input Gross Receipts as <b>INR {turnover:,.2f}</b> and net Presumptive Profit as <b>INR {tax_m['normal_income']:,.2f}</b>. If using <b>Sec 44ADA</b>, declare gross fees inside the professional metrics panel.",
-        f"<b>3. Schedule CG Overrides (Capital Gains):</b> Under Capital Gains, check the tick box for 'Equity shares/units of equity oriented MF liable to STT u/s 111A'. Open details and input audited values to override raw split gaps:<br/>&nbsp;&nbsp;&bull; <b>Full Value of Consideration (Total Sales):</b> INR {stock_m['stcg_sales']:,.2f}<br/>&nbsp;&nbsp;&bull; <b>Cost of Acquisition (Adjusted Purchases):</b> INR {stock_m['stcg_cost']:,.2f}<br/>&nbsp;&nbsp;&bull; <b>Expenditure wholly connected with transfer:</b> INR {stock_m['total_charges'] - 810.0:,.2f} <i>(Excluding STT as per Section 48 rules).</i>",
+        f"<b>3. Schedule CG Overrides (Capital Gains):</b> Under Capital Gains, check the tick box for 'Equity shares/units of equity oriented MF liable to STT u/s 111A'. Open details and input audited values to override raw split gaps:<br/>&nbsp;&nbsp;&bull; <b>Full Value of Consideration (Total Sales):</b> INR {stock_m['stcg_sales']:,.2f}<br/>&nbsp;&nbsp;&bull; <b>Cost of Acquisition (Adjusted Purchases):</b> INR {stock_m['stcg_cost']:,.2f}<br/>&nbsp;&nbsp;&bull; <b>Expenditure wholly connected with transfer:</b> INR {stock_m['total_charges'] - 810.0 if stock_m['total_charges'] > 810.0 else 0.0:,.2f} <i>(Excluding STT as per Section 48 rules).</i>",
         f"<b>4. Quarterly Capital Gains Mapping:</b> Scroll down to the bottom of Schedule CG to locate the 'Information about accrual/receipt of Capital Gains' grid. Distribute the net capital gains profit (<b>INR {stock_m['rectified_realized_pnl']:,.2f}</b>) across the matching quarterly brackets using actual sale transaction dates to align with the government's auto-validation rules.",
         f"<b>5. Final Verification & Zero-Tax Rebate Rules:</b> Proceed to the calculation review screen. Verify that the <b>Section 87A Rebate</b> automatically scales across both schedules because your absolute Gross Total Income (<b>INR {tax_m['gross_total_income']:,.2f}</b>) sits comfortably below the expanded threshold of the New Tax Regime. Confirm **Net Tax Payable Due** reads exactly <b>INR 0.00</b>, advance to verification, and execute your submission using Aadhaar OTP parameters securely."
     ]
@@ -228,64 +234,71 @@ st.title("🛡️ ProTax IA-Engine Pro")
 st.subheader("Dynamic Multistream Presumptive Business & Stock Ledger Tax Verification Hub")
 st.markdown("---")
 
+# Global Reset Layout Control Rule
+if st.session_state.audit_results is not None:
+    st.button("🧹 Clear Workspace & Load Next Client Profile", on_click=reset_system_pipeline, use_container_width=True, type="primary")
+    st.markdown("---")
+
 with st.sidebar:
     st.header("⚙️ Dynamic Profile Input")
-    input_name = st.text_input("Assessee Legal Name", value="Santhosh Srestaluri")
-    input_id = st.text_input("PAN / Client UCC Reference", value="5060260656")
+    # Clean default states for non-hardcoded variable processing
+    input_name = st.text_input("Assessee Legal Name", value="")
+    input_id = st.text_input("PAN / Client UCC Reference", value="")
     
     st.markdown("### Filing Route Determination")
-    route = st.radio("Filing Selection Logic Route:", ["Specified Professional (Sec 44ADA)", "General Small Business / Trade (Sec 44AD)"])
-    input_rate = st.slider("Target Presumptive Profit Margin Percentage (%)", 6.0, 50.0, 42.0 if "44AD" in route else 50.0, step=0.5)
+    route = st.radio("Filing Selection Logic Route:", ["General Small Business / Trade (Sec 44AD)", "Specified Professional (Sec 44ADA)"])
+    input_rate = st.slider("Target Presumptive Profit Margin Percentage (%)", 6.0, 50.0, 6.0 if "44AD" in route else 50.0, step=0.5)
 
 col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown("### 🏦 1. Banking Flow Ingestion")
-    bank_file = st.file_uploader("Upload Bank Ledger / Statement", type=['pdf', 'csv', 'xlsx', 'xls'])
+    bank_file = st.file_uploader("Upload Bank Ledger / Statement", type=['pdf', 'csv', 'xlsx', 'xls'], key="bank_uploader")
 with col2:
     st.markdown("### 📑 2. Government AIS Gateway")
-    ais_file = st.file_uploader("Upload Annual Information Statement", type=['pdf', 'txt', 'json'])
+    ais_file = st.file_uploader("Upload Annual Information Statement", type=['pdf', 'txt', 'json'], key="ais_uploader")
 with col3:
     st.markdown("### 📈 3. Capital Gains Ledger")
-    stock_file = st.file_uploader("Upload Broker Realized P&L Report", type=['xlsx', 'xls', 'csv'])
+    stock_file = st.file_uploader("Upload Broker Realized P&L Report", type=['xlsx', 'xls', 'csv'], key="stock_uploader")
 
 if st.button("🚀 Execute Comprehensive Compliance Audit", use_container_width=True):
-    computed_turnover = 0.0
-    stock_metrics = {"raw_realized_pnl": -123592.52, "rectified_realized_pnl": 59774.73, "total_charges": 1450.11, "stcg_sales": 264302.10, "stcg_cost": 204527.37}
-    
-    if bank_file:
-        fb = bank_file.read()
-        if bank_file.name.endswith('.pdf'):
-            computed_turnover = parse_bank_pdf_text(extract_text_from_pdf(fb))
-        else:
-            try:
-                df = pd.read_excel(io.BytesIO(fb)) if bank_file.name.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(fb))
-                credit_cols = [c for c in df.columns if any(x in str(c).lower() for x in ['credit', 'deposit', 'cr'])]
-                computed_turnover = pd.to_numeric(df[credit_cols[0]], errors='coerce').sum() if credit_cols else 945348.90
-            except:
-                computed_turnover = 945348.90
+    if not input_name or not input_id:
+        st.warning("⚠️ Please provide an Assessee Name and PAN/UCC Reference profile setup before computing lines.")
     else:
-        computed_turnover = 945348.90
-
-    if stock_file:
-        stock_metrics = parse_stock_ledger(stock_file.read(), stock_file.name)
-            
-    tax_metrics = compute_tax_liability(computed_turnover, input_rate, stock_metrics["rectified_realized_pnl"])
-    
-    if stock_metrics["rectified_realized_pnl"] != 0:
-        prescribed_itr = "ITR-2 (Capital Gains + Presumptive Combination Structure)"
-    else:
-        prescribed_itr = "ITR-4 (Sugam Pure Presumptive Base)"
+        computed_turnover = 0.0
+        stock_metrics = {"raw_realized_pnl": 0.0, "rectified_realized_pnl": 0.0, "total_charges": 0.0, "stcg_sales": 0.0, "stcg_cost": 0.0}
         
-    st.session_state.audit_results = {
-        "tax_m": tax_metrics,
-        "stock_m": stock_metrics,
-        "itr": prescribed_itr,
-        "turnover": computed_turnover
-    }
-    
-    st.session_state.pdf_payload = generate_pdf_report(
-        input_name, input_id, tax_metrics, stock_metrics, route, prescribed_itr, computed_turnover
-    )
+        if bank_file:
+            fb = bank_file.read()
+            if bank_file.name.endswith('.pdf'):
+                computed_turnover = parse_bank_pdf_text(extract_text_from_pdf(fb))
+            else:
+                try:
+                    df = pd.read_excel(io.BytesIO(fb)) if bank_file.name.endswith(('.xlsx', '.xls')) else pd.read_csv(io.BytesIO(fb))
+                    credit_cols = [c for c in df.columns if any(x in str(c).lower() for x in ['credit', 'deposit', 'cr'])]
+                    computed_turnover = pd.to_numeric(df[credit_cols[0]], errors='coerce').sum() if credit_cols else 0.0
+                except:
+                    computed_turnover = 0.0
+
+        if stock_file:
+            stock_metrics = parse_stock_ledger(stock_file.read(), stock_file.name)
+                
+        tax_metrics = compute_tax_liability(computed_turnover, input_rate, stock_metrics["rectified_realized_pnl"])
+        
+        if stock_metrics["rectified_realized_pnl"] != 0:
+            prescribed_itr = "ITR-2 (Capital Gains + Presumptive Combination Structure)"
+        else:
+            prescribed_itr = "ITR-4 (Sugam Pure Presumptive Base)"
+            
+        st.session_state.audit_results = {
+            "tax_m": tax_metrics,
+            "stock_m": stock_metrics,
+            "itr": prescribed_itr,
+            "turnover": computed_turnover
+        }
+        
+        st.session_state.pdf_payload = generate_pdf_report(
+            input_name, input_id, tax_metrics, stock_metrics, route, prescribed_itr, computed_turnover
+        )
 
 # -------------------------------------------------------------------------
 # PERSISTENT UI RENDERING LAYER
@@ -359,7 +372,7 @@ if st.session_state.audit_results is not None:
            * Click add details and input the calculated values:
              * **Full Value of Consideration (Total Sales):** `INR {res['stock_m']['stcg_sales']:,.2f}`
              * **Cost of Acquisition (Adjusted Purchases):** `INR {res['stock_m']['stcg_cost']:,.2f}`
-             * **Expenditure wholly connected with transfer:** `INR {res['stock_m']['total_charges'] - 810.0:,.2f}` *(Excluding STT)*.
+             * **Expenditure wholly connected with transfer:** `INR {res['stock_m']['total_charges'] - 810.0 if res['stock_m']['total_charges'] > 810.0 else 0.0:,.2f}` *(Excluding STT)*.
         
         4. **Map Quarterly Capital Gains Accruals Grid:**
            * Scroll down to the bottom of Schedule CG to locate the **Information about accrual/receipt of Capital Gains** grid.
