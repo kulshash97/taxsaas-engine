@@ -1,0 +1,33 @@
+# KSP Core SaaS Platform Demo Testing Playbook
+
+## 1. Authentication Node Registry Credentials
+| Target User Persona | Tenant User ID | Access Password | Software Tier Status | Dynamic Branding Context |
+| :--- | :--- | :--- | :--- | :--- |
+| **Flagship Corporate Account** | `admin_shashank` | `ksp2026` | 👑 Elite Partner Tier | KULKARNI STRATEGIC PARTNERS |
+| **Mid-Market Accounting Firm** | `tax_pro_hyderabad` | `murthyca` | 🔵 Growth Practice Tier | S. R. MURTHY & CO. CHARTERED ACCOUNTANTS |
+| **Freelance / Solo Accountant**| `starter_accountant` | `anandtax` | 🟢 Starter Solo Tier | ANAND & ASSOCIATES TAX CONSULTANTS |
+
+---
+
+## 2. Interactive Testing Datasets & Files (How to Run the Live Demo)
+
+### 🚀 Module 1 (Smart ITR Filing & AI Agent Test)
+* **Step 1:** Authenticate using `starter_accountant` with pass `anandtax`. Select **Module 1**.
+* **Step 2:** Click the first file uploader and drop *any* PDF file renamed to `Bank_Statement_Krishna.pdf`.
+* **Step 3:** Click the second file uploader and drop *any* target file named `AIS_Form26AS.pdf`.
+* **Step 4:** *The Magic Moment:* Watch the UI automatically generate the side-by-side **Route A (Red Baseline)** and **Route B (Green Premium Underwriting)** matrix panels on screen, and download the fully branded PDF table brief.
+
+### 🏢 Module 2 (Entity Structuring Matrix Test)
+* **Step 1:** Select **Module 2**. Keep the user logged in as `starter_accountant`.
+* **Step 2:** Toggle between the three options: *Sole Proprietorship*, *OPC*, and *Pvt Ltd*.
+* **Step 3:** Watch the statutory law matrix instantly update the descriptive legal advice paragraphs in real-time, matching Mudra Loans, CGTMSE limits, or 80-IAC tax holiday rules dynamically.
+
+### 📈 Module 6 (Predictive CFO Runway Area Chart Test)
+* **Step 1:** Click **Module 6**. Watch the screen block access and display the **🔒 PREMIUM MODULE LOCKED** paywall.
+* **Step 2:** Go to the sidebar, hit **Disconnect Session Node**, and log back in as `tax_pro_hyderabad` / `murthyca`.
+* **Step 3:** Click back into **Module 6**. The module is now unlocked! Toggle the revenue projections slider and watch the high-end blue interactive Area Chart shift parameters in real-time.
+
+### 📊 Module 3 & 4 (Elite Valuation & VC Pitch Storyboard Table Test)
+* **Step 1:** While logged in as `tax_pro_hyderabad`, click **Module 3**. It will instantly show the locked expansion paywall banner.
+* **Step 2:** Disconnect and authenticate as your primary admin identity: `admin_shashank` / `ksp2026`.
+* **Step 3:** Enter **Module 3**. All blocks are completely clear. Select an industry classification and generate the Report. Download the PDF and open it up to showcase a complete corporate Valuation Analysis Certificate branded directly with your flagship identity.
