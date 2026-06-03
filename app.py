@@ -184,7 +184,7 @@ def generate_pdf_report(client_name, pan_ucc, tax_m, stock_m, route, itr_form, t
     t_meta.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')), ('PADDING', (0,0), (-1,-1), 4), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1'))]))
     story.append(t_meta)
     
-    # Executive Summary Table Block (Fixed font box missing glyph and raw HTML tag leaks)
+    # Executive Summary Table Block
     story.append(Paragraph("I. Executive Compliance Breakdown Summary", section_style))
     breakdown_rows = [
         [Paragraph("<b>Financial Node Description</b>", bold_body), Paragraph("<b>Audited Value Matrix (INR)</b>", bold_body)],
@@ -200,7 +200,7 @@ def generate_pdf_report(client_name, pan_ucc, tax_m, stock_m, route, itr_form, t
     t_break.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')), ('PADDING', (0,0), (-1,-1), 4), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')), ('BACKGROUND', (0,6), (-1,6), colors.HexColor('#DCFCE7'))]))
     story.append(t_break)
     
-    # Step-by-Step E-Filing Protocols 
+    # Step-by-Step E-Filing Protocols
     story.append(Paragraph("II. Step-by-Step Official Portal E-Filing Protocol Details", section_style))
     story.append(Paragraph(f"<b>Mandatory Form Route Selection:</b> {itr_form}", bold_body))
     story.append(Spacer(1, 4))
