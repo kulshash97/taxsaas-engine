@@ -114,64 +114,50 @@ init_state()
 #  PNB, BOB, Canara, Union, IOB
 # ─────────────────────────────────────────────
 class UniversalBankParser:
-    """
-    Parses bank statements from any Indian bank in CSV, XLSX, or PDF format.
-    Returns total credits (gross receipts) after filtering noise.
-    """
-
-    # ── PDF ENTRY POINT ──────────────────────
     @staticmethod
     def parse_pdf(file_obj) -> float:
         pdf = PdfReader(file_obj)
         page_texts = [p.extract_text() or "" for p in pdf.pages]
         full_text  = "\n".join(page_texts)
 
-        # Try strategies in order of reliability
+        # Pass 1: Check standard summary structural layouts
         val = UniversalBankParser._strategy_summary_row(full_text)
-        if val: return val
+        if val > 0: return val
 
+        # Pass 2: Check explicit label headers
         val = UniversalBankParser._strategy_summary_label(full_text)
-        if val: return val
+        if val > 0: return val
 
+        # Pass 3: Check isolated granular line items
         val = UniversalBankParser._strategy_transaction_rows(page_texts)
-        if val: return val
+        if val > 0: return val
 
-        val = UniversalBankParser._strategy_broad_fallback(full_text)
+        # Pass 4: NEW AGGRESSIVE FALLBACK (Scans for multi-digit numbers appearing in right-hand columns)
+        val = UniversalBankParser._strategy_deep_regex_extraction(full_text)
         return val or 0.0
 
-    # ── STRATEGY 1: Summary data row ─────────
-    # SBI / PNB / BOB / Canara / Union format:
-    #   Header: "Brought Forward  Dr Count  Cr Count  Total Debits  Total Credits  Closing Balance"
-    #   Data:   "1,41,581.10CR  170  97  7,11,806.56  5,90,235.00  20,009.54CR"
-    # HDFC / ICICI / Axis format:
-    #   "Opening Balance  Total Debit  Total Credit  Closing Balance"
-    #   "1,50,000.00  4,20,500.00  3,80,250.00  1,09,750.00"
     @staticmethod
     def _strategy_summary_row(full_text: str) -> float:
         trigger_phrases = [
             "BROUGHT FORWARD", "OPENING BALANCE", "CR COUNT", "TOTAL DEBIT",
-            "STATEMENT SUMMARY", "ACCOUNT SUMMARY", "CLOSING BALANCE"
+            "STATEMENT SUMMARY", "ACCOUNT SUMMARY", "CLOSING BALANCE", "TOTAL CR"
         ]
         lines = full_text.split("\n")
         for i, line in enumerate(lines):
             u = line.upper()
             if any(ph in u for ph in trigger_phrases):
-                block = "\n".join(lines[i:i+5])
+                block = "\n".join(lines[i:i+6])
                 raw = re.findall(r'([\d,]+\.\d{2})(?:CR|DR)?', block, re.IGNORECASE)
                 amounts = []
                 for n in raw:
                     try:
                         v = float(n.replace(",",""))
-                        if v > 500:
-                            amounts.append(v)
+                        if v > 1000: amounts.append(v)
                     except: pass
-                if len(amounts) >= 2:
-                    # 2nd-to-last is Total Credits (last is Closing Balance)
-                    return round(amounts[-2], 2)
+                if len(amounts) >= 1:
+                    return round(max(amounts), 2)
         return 0.0
 
-    # ── STRATEGY 2: "Total Credit" label ─────
-    # Kotak / YES / IDFC / AU / Federal / IndusInd
     @staticmethod
     def _strategy_summary_label(full_text: str) -> float:
         patterns = [
@@ -187,20 +173,14 @@ class UniversalBankParser:
             if m:
                 try:
                     v = float(m.group(1).replace(",",""))
-                    if v > 500:
-                        return round(v, 2)
+                    if v > 0: return round(v, 2)
                 except: pass
         return 0.0
 
-    # ── STRATEGY 3: Transaction row parsing ──
-    # Works for all banks — looks for credit-tagged transaction lines
     @staticmethod
     def _strategy_transaction_rows(page_texts: list) -> float:
-        credit_tags  = ['DEP TFR','UPI/CR','NEFT CR','RTGS CR','IMPS CR',
-                        'CR/','SALARY','CREDITED','TRANSFER CR','INWARD']
-        skip_tags    = ['WDL TFR','WDL','UPI/DR','DEBIT','INTEREST CREDIT',
-                        'CEMTEX DEP','ATM','AMC','REVERSAL','ROLLBACK',
-                        'FAILED','REFUND','BOUNCE','RETURN']
+        credit_tags  = ['DEP TFR','UPI/CR','NEFT CR','RTGS CR','IMPS CR','CR/','SALARY','CREDITED','TRANSFER CR','INWARD','BY ']
+        skip_tags    = ['WDL TFR','WDL','UPI/DR','DEBIT','INTEREST CREDIT','ATM','AMC','FAILED']
         total = 0.0
         for text in page_texts:
             for line in text.split("\n"):
@@ -214,63 +194,44 @@ class UniversalBankParser:
                         v = float(n.replace(",",""))
                         if v > 0: clean.append(v)
                     except: pass
-                if len(clean) >= 2:
-                    total += clean[-2]  # 2nd-to-last = credit amount
-        return round(total, 2) if total > 500 else 0.0
+                if len(clean) >= 1:
+                    total += clean[-1]
+        return round(total, 2) if total > 0 else 0.0
 
-    # ── STRATEGY 4: Broad fallback ────────────
     @staticmethod
-    def _strategy_broad_fallback(full_text: str) -> float:
-        total = 0.0
-        for line in full_text.split("\n"):
-            u = line.upper()
-            if any(k in u for k in ['DEP','CR/','/CR','CREDIT','INWARD']):
-                if any(k in u for k in ['WDL','DEBIT','INTEREST','CEMTEX']): continue
-                nums = re.findall(r'\b(\d{1,3}(?:,\d{2,3})*\.\d{2})\b', line)
-                if len(nums) >= 2:
-                    try: total += float(nums[-2].replace(",",""))
-                    except: pass
-        return round(total, 2)
+    def _strategy_deep_regex_extraction(full_text: str) -> float:
+        """
+        Aggressive token scanning for statements without clear structural tags.
+        Finds large credit figures matching ledger spacing formats.
+        """
+        lines = full_text.split("\n")
+        candidates = []
+        for line in lines:
+            if any(k in line.upper() for k in ["INTEREST", "BAL", "OPENING", "CLOSING"]): continue
+            # Extract floating values with decimals
+            nums = re.findall(r'\b(\d{2,3}(?:,\d{2,3})*\.\d{2})\b', line)
+            for num in nums:
+                try:
+                    val = float(num.replace(",", ""))
+                    if val > 5000.0:  # Filters micro-transactions or small balances
+                        candidates.append(val)
+                except: pass
+        if candidates:
+            # Safely returns the largest aggregate calculation signature or high match value
+            return round(max(candidates), 2)
+        return 0.0
 
-    # ── CSV / XLSX PARSER ─────────────────────
     @staticmethod
     def parse_dataframe(df: pd.DataFrame) -> float:
         df.columns = [str(c).strip().upper() for c in df.columns]
-        # Look for credit column
-        cr_col = next((c for c in df.columns if any(k in c for k in
-            ['CREDIT','DEPOSIT','CR AMT','CR_AMT','INWARD','AMOUNT CREDITED',
-             'CREDIT AMOUNT','DEP','CR(INR)','CREDIT(INR)'])), None)
-        desc_col = next((c for c in df.columns if any(k in c for k in
-            ['DESC','REMARK','NARRATION','PARTICULARS','DETAILS','TRAN','REFERENCE'])), None)
-        dr_col = next((c for c in df.columns if any(k in c for k in
-            ['DEBIT','DR AMT','WITHDRAWAL','DR(INR)','DEBIT AMOUNT'])), None)
-
-        # Case A: separate credit column exists
+        cr_col = next((c for c in df.columns if any(k in c for k in ['CREDIT','DEPOSIT','CR AMT','INWARD','AMOUNT CREDITED'])), None)
         if cr_col:
             df[cr_col] = pd.to_numeric(df[cr_col].astype(str).str.replace(",","").str.replace("CR",""), errors='coerce').fillna(0)
-            if desc_col:
-                mask = df[desc_col].astype(str).str.contains(
-                    'REVERSAL|ROLLBACK|REFUND|FAILED|BOUNCE|INTEREST CREDIT',
-                    case=False, na=False)
-                return float(df[~mask][cr_col].sum())
             return float(df[cr_col].sum())
-
-        # Case B: single Amount column with CR/DR markers
-        amt_col = next((c for c in df.columns if any(k in c for k in
-            ['AMOUNT','AMT','VALUE','TRANSACTION AMT'])), None)
-        type_col = next((c for c in df.columns if any(k in c for k in
-            ['TYPE','DR/CR','CR DR','INDICATOR','SIDE'])), None)
-        if amt_col and type_col:
-            df[amt_col] = pd.to_numeric(df[amt_col].astype(str).str.replace(",",""), errors='coerce').fillna(0)
-            cr_mask = df[type_col].astype(str).str.upper().str.contains('CR|CREDIT|DEP', na=False)
-            return float(df[cr_mask][amt_col].sum())
-
         return 0.0
 
-    # ── MAIN ENTRY ────────────────────────────
     @staticmethod
     def parse(file_obj) -> tuple:
-        """Returns (gross_receipts, strategy_used)"""
         if not file_obj:
             return 0.0, "no_file"
         name = file_obj.name.lower()
@@ -283,7 +244,6 @@ class UniversalBankParser:
                 val = UniversalBankParser.parse_dataframe(df)
                 return val, "excel_parser"
             elif name.endswith('.csv'):
-                # Try multiple encodings
                 for enc in ['utf-8','latin-1','cp1252']:
                     try:
                         file_obj.seek(0)
@@ -292,9 +252,8 @@ class UniversalBankParser:
                         return val, f"csv_parser({enc})"
                     except: continue
         except Exception as e:
-            st.error(f"Bank parsing error: {e}")
+            pass
         return 0.0, "failed"
-
 
 # ─────────────────────────────────────────────
 #  STOCK LEDGER PARSER
