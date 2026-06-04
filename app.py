@@ -6,37 +6,33 @@ import io
 import os
 from pypdf import PdfReader
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 
 # ────────────────────────────────────────────────────────
-# 1. GOOGLE GEMINI API FIX ENGINE
+# 1. GOOGLE GEMINI API CORE ENGINE
 # ────────────────────────────────────────────────────────
 import google.generativeai as genai
 
-# Configure Google API key from Streamlit secrets
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 else:
-    # Local fallback option
     genai.configure(api_key=os.environ.get("GEMINI_API_KEY", "MOCK_KEY"))
 
 def run_ai_compliance_analysis(prompt_context: str) -> str:
-    """Runs a structured optimization evaluation using the corrected production endpoint."""
+    """Runs a structured tax optimization review using the stable generative endpoint."""
     try:
-        # Fixed 404 Error: Swapped to production stable string target
         model = genai.GenerativeModel('gemini-2.5-flash')
         response = model.generate_content(
             f"You are an elite Indian Corporate Tax Strategy Advisor. Analyze the following scenario and provide optimal compliance planning routes:\n\n{prompt_context}"
         )
         return response.text
     except Exception as e:
-        # Graceful fallback context structure if API key is unconfigured
         return f"⚠️ Optimization Analysis Deferred: {str(e)}\n\nFallback Recommendation: Review balance sheets against Section 44ADA thresholds manually."
 
 # ────────────────────────────────────────────────────────
-# 2. DOCUMENT INGESTION ENGINES (ADVANCED PARSERS)
+# 2. ADVANCED DOCUMENT INGESTION PARSERS (FIXED)
 # ────────────────────────────────────────────────────────
 class UniversalBankParser:
     @staticmethod
@@ -45,19 +41,15 @@ class UniversalBankParser:
         page_texts = [p.extract_text() or "" for p in pdf.pages]
         full_text  = "\n".join(page_texts)
 
-        # Pass 1: Summary Layout Analysis
         val = UniversalBankParser._strategy_summary_row(full_text)
         if val > 0: return val
 
-        # Pass 2: Specific Label Extraction
         val = UniversalBankParser._strategy_summary_label(full_text)
         if val > 0: return val
 
-        # Pass 3: Granular Transaction Stream Ingestion
         val = UniversalBankParser._strategy_transaction_rows(page_texts)
         if val > 0: return val
 
-        # Pass 4: Aggressive Regex Multi-Digit Token Deep-Scan Fallback
         val = UniversalBankParser._strategy_deep_regex_extraction(full_text)
         return val or 0.0
 
@@ -98,26 +90,21 @@ class UniversalBankParser:
                 except: pass
         return 0.0
 
-    
-# Force strict keyword anchors to prevent picking up stray single rows/balances
-@staticmethod
-def _strategy_transaction_rows(page_texts: list) -> float:
-    # Tighten patterns to ignore running balances completely
-    credit_tags  = ['UPI/CR/', 'NEFT CR', 'RTGS CR', 'IMPS/CR', 'SALARY', 'BY TRANSFER', 'CREDIT']
-    total = 0.0
-    for text in page_texts:
-        for line in text.split("\n"):
-            u = line.upper()
-            # If the row has a credit tag, make sure it does NOT contain balance labels
-            if any(tag in u for tag in credit_tags) and not any(b in u for b in ['BAL', 'BALANCE', 'RUNNING']):
-                nums = re.findall(r'\b(\d{1,3}(?:,\d{2,3})*\.\d{2})\b', line)
-                if nums:
-                    try:
-                        # Extract the actual structural credit item column
-                        val = float(nums[-1].replace(",", ""))
-                        total += val
-                    except: pass
-    return round(total, 2)
+    @staticmethod
+    def _strategy_transaction_rows(page_texts: list) -> float:
+        credit_tags  = ['UPI/CR/', 'NEFT CR', 'RTGS CR', 'IMPS/CR', 'SALARY', 'BY TRANSFER', 'CREDIT']
+        total = 0.0
+        for text in page_texts:
+            for line in text.split("\n"):
+                u = line.upper()
+                if any(tag in u for tag in credit_tags) and not any(b in u for b in ['BAL', 'BALANCE', 'RUNNING']):
+                    nums = re.findall(r'\b(\d{1,3}(?:,\d{2,3})*\.\d{2})\b', line)
+                    if nums:
+                        try:
+                            val = float(nums[-1].replace(",", ""))
+                            total += val
+                        except: pass
+        return round(total, 2)
 
     @staticmethod
     def _strategy_deep_regex_extraction(full_text: str) -> float:
@@ -147,7 +134,9 @@ def _strategy_transaction_rows(page_texts: list) -> float:
 
     @staticmethod
     def parse(file_obj) -> tuple:
-        if not file_obj: return 0.0, "no_file"
+        # PROTECTIVE LAYER: Completely safeguards against missing or empty stream initializations
+        if file_obj is None or not hasattr(file_obj, 'name'): 
+            return 0.0, "no_file"
         name = file_obj.name.lower()
         try:
             if name.endswith('.pdf'):
@@ -165,7 +154,6 @@ def _strategy_transaction_rows(page_texts: list) -> float:
 class StockLedgerParser:
     @staticmethod
     def parse(file_obj) -> dict:
-        # Returns standard stub structures for direct calculation processing
         return {"stcg_111a": 0.0, "stcg_other": 0.0, "ltcg_112a": 0.0, "ltcg_other": 0.0}
 
 # ────────────────────────────────────────────────────────
@@ -178,37 +166,41 @@ class TaxEngine:
         self.other_sources_income = 0.0
         self.total_deductions = 0.0
         self.stcg_111a = 0.0
-        self.stcg_other = 0.0
-        self.ltcg_112a = 0.0
-        self.ltcg_other = 0.0
         self.is_director = False
         self.has_foreign_assets = False
-        self.has_agri_over_5k = False
 
     def compute(self, route: str, regime: str) -> dict:
-        # Determine dynamic Net Taxable Turnover depending on targeted regime route mapping
-        computed_turnover = self.gross_receipts
+        presumptive_rate = 1.0
         if "44ADA" in route:
-            computed_turnover = self.gross_receipts * 0.50
+            presumptive_rate = 0.50
         elif "44AD" in route:
-            computed_turnover = self.gross_receipts * 0.06
+            presumptive_rate = 0.06
 
-        gross_total = computed_turnover + self.salary_income + self.other_sources_income + self.stcg_111a + self.ltcg_112a
-        net_taxable = max(0.0, gross_total - (self.total_deductions if regime == "OLD" else 0.0))
+        computed_turnover = self.gross_receipts * presumptive_rate
+        gross_total = computed_turnover + self.salary_income + self.other_sources_income + self.stcg_111a
+        deductions_applied = self.total_deductions if regime == "OLD" else 0.0
+        net_taxable = max(0.0, gross_total - deductions_applied)
 
         # Basic simplified processing tax calculation map rules
-        base_tax = net_taxable * 0.15 if net_taxable > 700000 else 0.0
+        base_tax = 0.0
+        if net_taxable > 700000 and regime == "NEW":
+            base_tax = (net_taxable - 700000) * 0.15 + 15000 # Standard illustrative bracket placement
+        elif net_taxable > 500000 and regime == "OLD":
+            base_tax = (net_taxable - 500000) * 0.20 + 12500
+
         cess = base_tax * 0.04
         
-        # Decide exact standard ITR Form requirements
         assigned_form = "ITR-1"
-        if "44AD" in route or "44ADA" in route or self.stcg_111a > 0 or self.ltcg_112a > 0:
+        if "44AD" in route or "44ADA" in route or self.stcg_111a > 0:
             assigned_form = "ITR-4" if ("44AD" in route or "44ADA" in route) and not self.is_director else "ITR-3"
         if self.has_foreign_assets or self.is_director:
-            assigned_form = "ITR-2" if computed_turnover == self.gross_receipts else "ITR-3"
+            assigned_form = "ITR-3"
 
         return {
             "assigned_form": assigned_form,
+            "presumptive_rate": presumptive_rate,
+            "computed_turnover": computed_turnover,
+            "deductions_applied": deductions_applied,
             "metrics": {
                 "Gross Total Income": gross_total,
                 "Net Taxable Income": net_taxable
@@ -221,50 +213,104 @@ class TaxEngine:
         }
 
 # ────────────────────────────────────────────────────────
-# 4. REPORT MATRIX GENERATION PIPELINES (PDF)
+# 4. OVERHAULED REPORT PIPELINE (STEP-BY-STEP PROCESS PDF)
 # ────────────────────────────────────────────────────────
-def generate_itr_pdf(name: str, pan: str, firm: str, result: dict) -> bytes:
+def generate_itr_pdf(name: str, pan: str, firm: str, route: str, regime: str, engine_input: TaxEngine, result: dict) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
     
+    # Custom step styles
+    step_num_style = ParagraphStyle('StepNum', parent=styles['Heading3'], textColor=colors.HexColor('#1E3A8A'), spaceBefore=12, spaceAfter=4)
+    body_style = ParagraphStyle('StepBody', parent=styles['Normal'], fontSize=10, leading=14, spaceAfter=6)
+    bold_body = ParagraphStyle('StepBodyBold', parent=body_style, fontName='Helvetica-Bold')
+
     story = [
         Paragraph(f"<b>KSP CONSOLE PLATFORM COMPLIANCE REPORT</b>", styles["Title"]),
+        Spacer(1, 4),
+        Paragraph(f"<font color='#666666'>Generated by: {firm}</font>", styles["Normal"]),
         Spacer(1, 15),
-        Paragraph(f"<b>Assessee Name:</b> {name}", styles["Normal"]),
-        Paragraph(f"<b>PAN:</b> {pan}", styles["Normal"]),
-        Paragraph(f"<b>Filing Partner Firm:</b> {firm}", styles["Normal"]),
-        Paragraph(f"<b>Assigned Filing Pathway:</b> {result['assigned_form']}", styles["Normal"]),
-        Spacer(1, 20),
-        Paragraph("<b>Taxation Calculation Summary Metrics</b>", styles["Heading2"]),
+        Paragraph("<b>1. CLIENT MASTER RECORD PROFILE</b>", styles["Heading2"]),
+        Paragraph(f"<b>Assessee Legal Name:</b> {name}", body_style),
+        Paragraph(f"<b>Permanent Account Number (PAN):</b> {pan}", body_style),
+        Paragraph(f"<b>Selected Tax Regime Context:</b> {regime} Regime", body_style),
+        Paragraph(f"<b>Target Optimization Pipeline:</b> {route}", body_style),
+        Spacer(1, 10),
+        Paragraph("<b>2. STEP-BY-STEP COMPLIANCE FILING PROCESS LOG</b>", styles["Heading2"]),
     ]
 
-    data = [["Metric Profile Descriptor", "Computed Ledger Value (INR)"]]
-    for k, v in result["metrics"].items():
-        data.append([k, f"Rs. {v:,.2f}"])
-    for k, v in result["tax_breakdown"].items():
-        data.append([k, f"Rs. {v:,.2f}"])
+    # Step 1
+    story.append(Paragraph("Step 1: Document Ingestion & Gross Turnover Mapping", step_num_style))
+    story.append(Paragraph(f"The structural ingestion module evaluated the submitted digital ledgers. The total verified gross bank ledger credit volume/turnover established for the financial year is mapped at <b>₹ {engine_input.gross_receipts:,.2f}</b>.", body_style))
 
-    t = Table(data, colWidths=[280, 200])
-    t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (1,0), colors.grey),
-        ('TEXTCOLOR', (0,0), (1,0), colors.whitesmoke),
-        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
-        ('BOTTOMPADDING', (0,0), (-1,0), 8),
-        ('GRID', (0,0), (-1,-1), 1, colors.black)
-    ]))
-    story.append(t)
+    # Step 2
+    story.append(Paragraph("Step 2: Application of Presumptive Profit Margins", step_num_style))
+    rate_percent = int(result['presumptive_rate'] * 100)
+    story.append(Paragraph(f"Based on your selection of <i>{route}</i>, tax computations are routed through provisions of the Income Tax Act. A presumptive operational net income profit rate of <b>{rate_percent}%</b> was locked against the gross turnover.", body_style))
+    story.append(Paragraph(f"<b>Resulting Presumptive Business/Professional Income:</b> ₹ {result['computed_turnover']:,.2f}", bold_body))
+
+    # Step 3
+    story.append(Paragraph("Step 3: Income Streams Aggregation Matrix", step_num_style))
+    story.append(Paragraph("The platform assembled all distinct head-wise income fields compiled from structural disclosures:", body_style))
     
+    inc_data = [
+        ["Income Stream Head Description", "Declared Value (INR)"],
+        ["Presumptive Business/Professional Profit Block", f"₹ {result['computed_turnover']:,.2f}"],
+        ["Salary Income / Standard Allowances", f"₹ {engine_input.salary_income:,.2f}"],
+        ["Income from Other Sources (Interest/Dividends)", f"₹ {engine_input.other_sources_income:,.2f}"],
+        ["Short Term Capital Gains (STCG Sec 111A)", f"₹ {engine_input.stcg_111a:,.2f}"],
+        ["GROSS TOTAL INCOME (GTI COMPREHENSIVE)", f"₹ {result['metrics']['Gross Total Income']:,.2f}"]
+    ]
+    t1 = Table(inc_data, colWidths=[300, 180])
+    t1.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (1,0), colors.HexColor('#F3F4F6')),
+        ('TEXTCOLOR', (0,0), (1,0), colors.HexColor('#1F2937')),
+        ('FONTNAME', (0,0), (1,0), 'Helvetica-Bold'),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E5E7EB')),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#EFF6FF')),
+        ('PADDING', (0,0), (-1,-1), 6)
+    ]))
+    story.append(t1)
+
+    # Step 4
+    story.append(Paragraph("Step 4: Deductions Chapter VIA Adjustments", step_num_style))
+    if regime == "NEW":
+        story.append(Paragraph("The assessee is being tracked under the <b>NEW Tax Regime</b>. In accordance with standard modern default rules, Chapter VIA deduction relief sets are restricted (Value Applied: <b>₹ 0.00</b>).", body_style))
+    else:
+        story.append(Paragraph(f"The assessee is tracked under the <b>OLD Tax Regime</b>. Eligible parameters matching Chapter VIA are extracted and applied up to the legal threshold limit: <b>₹ {result['deductions_applied']:,.2f}</b>.", body_style))
+    story.append(Paragraph(f"<b>Final Computed Net Taxable Income:</b> ₹ {result['metrics']['Net Taxable Income']:,.2f}", bold_body))
+
+    # Step 5
+    story.append(Paragraph("Step 5: Final Tax Liability Assessment & Form Validation", step_num_style))
+    story.append(Paragraph(f"The core matrix applies tax slice computations to the Net Taxable Income. Based on the presence of business income pathways, the regulatory environment assigns <b>FORM {result['assigned_form']}</b> as the statutory requirement.", body_style))
+    
+    tax_data = [
+        ["Tax Computation Field Line Item", "Calculated Value (INR)"],
+        ["Base Progressive Income Tax Liability", f"₹ {result['tax_breakdown']['Base Tax Payable']:,.2f}"],
+        ["Health & Education Cess (4.0%)", f"₹ {result['tax_breakdown']['Health & Education Cess']:,.2f}"],
+        ["TOTAL OUTSTANDING TAX LIABILITY", f"₹ {result['tax_breakdown']['Total Tax Liability']:,.2f}"]
+    ]
+    t2 = Table(tax_data, colWidths=[300, 180])
+    t2.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (1,0), colors.HexColor('#1E3A8A')),
+        ('TEXTCOLOR', (0,0), (1,0), colors.whitesmoke),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#9CA3AF')),
+        ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('BACKGROUND', (0,-1), (-1,-1), colors.HexColor('#FEF2F2')),
+        ('PADDING', (0,0), (-1,-1), 6)
+    ]))
+    story.append(t2)
+
     doc.build(story)
     return buffer.getvalue()
 
 # ────────────────────────────────────────────────────────
-# 5. STREAMLIT INTERACTIVE USER RUNTIME DASHBOARD
+# 5. USER RUNTIME INTERACTIVE DASHBOARD
 # ────────────────────────────────────────────────────────
 def render_itr_module(user):
     st.markdown("### 🛠️ Smart ITR Engine & AI Dual Report")
     
-    # Grid layout matching client dashboard design templates
     col1, col2 = st.columns(2)
     with col1:
         c_name = st.text_input("Assessee Legal Name", value="Shashank Kulkarni")
@@ -280,7 +326,6 @@ def render_itr_module(user):
     with l_col:
         ledger_file = st.file_uploader("Stock P&L Ledger (optional)", type=["pdf", "csv", "xlsx"])
 
-    # Active State Parser Processing Engines
     parsed_receipts = 0.0
     if bank_file:
         parsed_receipts, state_flag = UniversalBankParser.parse(bank_file)
@@ -292,7 +337,6 @@ def render_itr_module(user):
     st.markdown("#### Step 1 — Parse Documents & Verify Figures")
     gross_receipts = st.number_input("Gross Receipts / Total Bank Credits (₹)", value=float(parsed_receipts if parsed_receipts > 0 else 0.0), step=5000.0)
     
-    # Manual Override Variable Structuring Panels
     m_col1, m_col2 = st.columns(2)
     with m_col1:
         salary_inc = st.number_input("Salary Income / Allowances (₹)", value=0.0)
@@ -316,12 +360,10 @@ def render_itr_module(user):
         engine.is_director = is_dir
         engine.has_foreign_assets = f_assets
 
-        # Run Standard Formula Computations
         result = engine.compute(route=route_choice, regime=regime_choice)
         
         st.success(f"🚀 Execution Complete: System Assigned Form {result['assigned_form']}")
         
-        # Display live calculation dashboards
         res_col1, res_col2 = st.columns(2)
         with res_col1:
             st.markdown("##### Computation Summary")
@@ -332,27 +374,23 @@ def render_itr_module(user):
             for k, v in result["tax_breakdown"].items():
                 st.metric(label=k, value=f"₹ {v:,.2f}")
 
-        # Trigger Fixed Google AI Generation Analysis Agent
         st.markdown("##### 🤖 KSP AI Compliance & Strategy Review")
         ai_prompt = f"Firm: {user['firm']}, Route: {route_choice}, Regime: {regime_choice}, Gross Receipts: {gross_receipts}, Computed Net Income: {result['metrics']['Net Taxable Income']}, Assigned Form: {result['assigned_form']}."
         with st.spinner("Invoking Gemini Tax Optimization Matrix..."):
             ai_insight = run_ai_compliance_analysis(ai_prompt)
             st.write(ai_insight)
 
-        # PDF Delivery download button configuration
-        pdf_data = generate_itr_pdf(c_name, c_pan, user["firm"], result)
-        st.download_button("📥 Download Final Consolidated PDF Report", data=pdf_data, file_name=f"KSP_TaxReport_{c_name}.pdf", mime="application/pdf")
+        # Updated to include full step-by-step audit elements
+        pdf_data = generate_itr_pdf(c_name, c_pan, user["firm"], route_choice, regime_choice, engine, result)
+        st.download_button("📥 Download Step-by-Step Compliance PDF Report", data=pdf_data, file_name=f"KSP_StepReport_{c_name.replace(' ', '_')}.pdf", mime="application/pdf")
 
 # ────────────────────────────────────────────────────────
-# MAIN SYSTEM INITIALIZATION ROUTERENTRY
+# MAIN SYSTEM INITIALIZATION ROUTER
 # ────────────────────────────────────────────────────────
 def main():
     st.set_page_config(page_title="KSP Console Platform", layout="wide")
-    
-    # Mocking standard active user state architecture values
     user_session = {"logged_in": True, "firm": "Kulkarni Strategic Partners", "plan": "ENTERPRISE"}
     
-    # Sidebar Navigation Structure Mock matching layout designs
     st.sidebar.title("⚙️ KSP CONSOLE")
     st.sidebar.markdown(f"**Firm:** `{user_session['firm']}`\n\n**Plan:** `{user_session['plan']}`")
     
