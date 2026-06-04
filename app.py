@@ -118,8 +118,8 @@ if st.button("Run Fully Automated Verification Pipeline", type="primary"):
             """
 
             try:
-                # Execution call using gemini-1.5-flash
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                # Updated to the active, live version endpoint to resolve 404
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 response = model.generate_content(orchestration_prompt)
                 ai_output = response.text
                 
