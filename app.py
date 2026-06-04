@@ -98,26 +98,26 @@ class UniversalBankParser:
                 except: pass
         return 0.0
 
-    @staticmethod
-    def _strategy_transaction_rows(page_texts: list) -> float:
-        credit_tags  = ['DEP TFR','UPI/CR','NEFT CR','RTGS CR','IMPS CR','CR/','SALARY','CREDITED','TRANSFER CR','INWARD','BY ']
-        skip_tags    = ['WDL TFR','WDL','UPI/DR','DEBIT','INTEREST CREDIT','ATM','AMC']
-        total = 0.0
-        for text in page_texts:
-            for line in text.split("\n"):
-                u = line.upper()
-                if not any(t in u for t in credit_tags): continue
-                if any(t in u for t in skip_tags):       continue
+    
+# Force strict keyword anchors to prevent picking up stray single rows/balances
+@staticmethod
+def _strategy_transaction_rows(page_texts: list) -> float:
+    # Tighten patterns to ignore running balances completely
+    credit_tags  = ['UPI/CR/', 'NEFT CR', 'RTGS CR', 'IMPS/CR', 'SALARY', 'BY TRANSFER', 'CREDIT']
+    total = 0.0
+    for text in page_texts:
+        for line in text.split("\n"):
+            u = line.upper()
+            # If the row has a credit tag, make sure it does NOT contain balance labels
+            if any(tag in u for tag in credit_tags) and not any(b in u for b in ['BAL', 'BALANCE', 'RUNNING']):
                 nums = re.findall(r'\b(\d{1,3}(?:,\d{2,3})*\.\d{2})\b', line)
-                clean = []
-                for n in nums:
+                if nums:
                     try:
-                        v = float(n.replace(",",""))
-                        if v > 0: clean.append(v)
+                        # Extract the actual structural credit item column
+                        val = float(nums[-1].replace(",", ""))
+                        total += val
                     except: pass
-                if len(clean) >= 1:
-                    total += clean[-1]
-        return round(total, 2) if total > 0 else 0.0
+    return round(total, 2)
 
     @staticmethod
     def _strategy_deep_regex_extraction(full_text: str) -> float:
