@@ -57,18 +57,10 @@ section[data-testid="stSidebar"] .stRadio label { font-size: 0.85rem; }
     padding: 1.25rem 1.5rem;
     margin-bottom: 1rem;
 }
-.ksp-card-accent {
-    border-left: 3px solid #58A6FF;
-}
-.ksp-card-success {
-    border-left: 3px solid #3FB950;
-}
-.ksp-card-warning {
-    border-left: 3px solid #D29922;
-}
-.ksp-card-danger {
-    border-left: 3px solid #F85149;
-}
+.ksp-card-accent { border-left: 3px solid #58A6FF; }
+.ksp-card-success { border-left: 3px solid #3FB950; }
+.ksp-card-warning { border-left: 3px solid #D29922; }
+.ksp-card-danger { border-left: 3px solid #F85149; }
 
 /* Metric overrides */
 [data-testid="metric-container"] {
@@ -211,15 +203,13 @@ hr { border-color: #30363D !important; margin: 1rem 0; }
 
 # ─────────────────────────────────────────────
 #  B2B CREDENTIALS STORE
-#  In production: replace with DB / env secrets
 # ─────────────────────────────────────────────
 B2B_USERS = {
-    # username       : (password,          firm_name,                    plan,       modules_allowed)
-    "admin"          : ("KSP@2026#Admin",  "Kulkarni Strategic Partners","ENTERPRISE", "all"),
-    "ca_shashank"    : ("Shashank@KSP1",   "Shashank Kulkarni & Associates","PRO",    "all"),
-    "firm_abc"       : ("FirmABC@2026",    "ABC Tax Consultants",         "STANDARD", ["itr","gst"]),
-    "firm_xyz"       : ("XYZ@Filing1",     "XYZ Financial Services",      "PRO",      "all"),
-    "demo_user"      : ("Demo@1234",       "Demo Firm (Trial)",           "TRIAL",    ["itr"]),
+    "admin"          : ("KSP@2026#Admin",  "Kulkarni Strategic Partners", "ENTERPRISE", "all"),
+    "ca_shashank"    : ("Shashank@KSP1",   "Shashank Kulkarni & Associates", "PRO", "all"),
+    "firm_abc"       : ("FirmABC@2026",    "ABC Tax Consultants", "STANDARD", ["itr", "gst"]),
+    "firm_xyz"       : ("XYZ@Filing1",     "XYZ Financial Services", "PRO", "all"),
+    "demo_user"      : ("Demo@1234",       "Demo Firm (Trial)", "TRIAL", ["itr"]),
 }
 
 def authenticate(username, password):
@@ -252,7 +242,7 @@ def init_state():
 init_state()
 
 # ─────────────────────────────────────────────
-#  LOGIN PAGE
+#  LOGIN PAGE (Fixed Workflow)
 # ─────────────────────────────────────────────
 def render_login():
     st.markdown("""
@@ -266,20 +256,20 @@ def render_login():
     col_c = st.columns([1, 2, 1])[1]
     with col_c:
         uname = st.text_input("Username", placeholder="Enter your firm username", key="login_u")
-        pwd   = st.text_input("Password", type="password", placeholder="Enter password", key="login_p")
+        pwd = st.text_input("Password", type="password", placeholder="Enter password", key="login_p")
         st.markdown("")
 
-        login_col = st.container()
-        with login_col:
-            st.markdown('<div class="login-btn">', unsafe_allow_html=True)
-            clicked = st.button("🔐  Authenticate & Enter Platform", use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div class="login-btn">', unsafe_allow_html=True)
+        clicked = st.button("🔐 Authenticate & Enter Platform", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
         if clicked:
             result = authenticate(uname, pwd)
             if result:
                 st.session_state.logged_in = True
                 st.session_state.user = result
+                st.success("Authentication successful! Redirecting...")
+                time.sleep(0.5)
                 st.rerun()
             else:
                 st.error("❌ Invalid credentials. Contact your KSP administrator.")
@@ -302,19 +292,18 @@ class RobustTaxEngine:
 
         self.gross_receipts          = 0.0
         self.presumptive_profit      = 0.0
-        self.stcg_111a               = 0.0   # Listed equity / ETF STCG
-        self.stcg_other              = 0.0   # Debt / other STCG (slab rate)
-        self.ltcg_112a               = 0.0   # Listed equity LTCG (10% above 1.25L)
-        self.ltcg_other              = 0.0   # Debt / other LTCG (20% with indexation)
+        self.stcg_111a               = 0.0
+        self.stcg_other              = 0.0
+        self.ltcg_112a               = 0.0
+        self.ltcg_other              = 0.0
         self.salary_income           = 0.0
         self.other_sources_income    = 0.0
-        self.total_deductions        = 0.0   # Only relevant for OLD regime
+        self.total_deductions        = 0.0
 
         self.is_director_or_unlisted = False
         self.has_foreign_assets      = False
         self.has_agri_over_5k        = False
 
-    # ── BANK PARSER ──────────────────────────
     def parse_bank_statement(self):
         if not self.bank_file:
             return
@@ -332,22 +321,6 @@ class RobustTaxEngine:
             st.error(f"Bank parsing error: {e}")
 
     def _parse_bank_pdf(self):
-        """
-        4-strategy SBI / Indian bank PDF parser — fixed for real SBI statement format.
-
-        SBI summary page (last page) looks like this after text extraction:
-            Statement Summary : 01-04-2024 To 31-03-2025
-            Brought Forward Dr Count Cr Count Total Debits Total Credits Closing Balance
-            1,41,581.10CR 170 97 7,11,806.56 5,90,235.00 20,009.54CR
-
-        The Total Credits value is the 5th number on the data row that follows the
-        header row containing "Brought Forward". We target this directly.
-
-        Strategy 1: Parse the SBI summary data row — most reliable.
-        Strategy 2: Look for "Total Credits" label followed by a number on same/next line.
-        Strategy 3: Row-by-row DEP TFR transaction parsing (credit column = 2nd-to-last number).
-        Strategy 4: Broad keyword fallback.
-        """
         pdf = PdfReader(self.bank_file)
         full_text = ""
         page_texts = []
@@ -356,17 +329,10 @@ class RobustTaxEngine:
             page_texts.append(t)
             full_text += t + "\n"
 
-        # ── STRATEGY 1: SBI summary data row parser ───────────────────────────
-        # After extracting text, the summary block looks like:
-        # "Brought Forward Dr Count Cr Count Total Debits Total Credits Closing Balance"
-        # followed by a line like: "1,41,581.10CR 170 97 7,11,806.56 5,90,235.00 20,009.54CR"
-        # The 5th number (after stripping CR suffix) is Total Credits.
         lines = full_text.split("\n")
         for i, line in enumerate(lines):
             if "BROUGHT FORWARD" in line.upper() or ("CR COUNT" in line.upper() and "DR COUNT" in line.upper()):
-                # The data row is this line or the next 1-2 lines
                 search_block = "\n".join(lines[i:i+4])
-                # Extract all numbers (with optional CR/DR suffix)
                 raw_nums = re.findall(r'([\d,]+\.\d{2})(?:CR|DR)?', search_block, re.IGNORECASE)
                 clean_nums = []
                 for n in raw_nums:
@@ -374,21 +340,14 @@ class RobustTaxEngine:
                         clean_nums.append(float(n.replace(",", "")))
                     except:
                         pass
-                # SBI summary row structure:
-                # [BroughtForward, TotalDebits, TotalCredits, ClosingBalance]
-                # or with counts inserted: [BF, DrCount, CrCount, TotalDebits, TotalCredits, CB]
-                # Total Credits is always the 2nd-to-last meaningful amount (before Closing Bal)
-                # Filter out small integers (counts like 170, 97)
                 amounts = [v for v in clean_nums if v > 500]
                 if len(amounts) >= 2:
-                    # Second-to-last is Total Credits, last is Closing Balance
                     total_credits = amounts[-2]
                     if total_credits > 1000:
                         self.gross_receipts = round(total_credits, 2)
                         st.info(f"✅ Bank PDF parsed via Summary Row — Total Credits: ₹{total_credits:,.2f}")
                         return
 
-        # ── STRATEGY 2: "Total Credits" label followed by number ─────────────
         tc_patterns = [
             r'Total\s+Credits?\s*[\(₹\)]*\s*:?\s*([\d,]+\.\d{2})',
             r'Total\s+Cr(?:edits?)?\s+([\d,]+\.\d{2})',
@@ -406,14 +365,8 @@ class RobustTaxEngine:
                 except:
                     pass
 
-        # ── STRATEGY 3: Row-by-row DEP TFR / UPI/CR transaction summing ──────
-        # SBI PDF credit transactions are tagged as "DEP TFR" or contain "UPI/CR"
-        # The credit amount is the 2nd-to-last number on the line (last = running balance).
-        # We exclude: INTEREST CREDIT (savings interest), CEMTEX DEP (refund reversals).
-        skip_keywords = ['WDL TFR', 'WDL', 'DEBIT', 'INTEREST CREDIT',
-                         'CEMTEX', 'ATM', 'AMC', 'REVERSAL', 'ROLLBACK', 'FAILED']
-        credit_keywords = ['DEP TFR', 'UPI/CR', 'NEFT CR', 'RTGS CR', 'IMPS CR',
-                           'SALARY', 'TRANSFER CR', '/CR/', 'CR/']
+        skip_keywords = ['WDL TFR', 'WDL', 'DEBIT', 'INTEREST CREDIT', 'CEMTEX', 'ATM', 'AMC', 'REVERSAL', 'ROLLBACK', 'FAILED']
+        credit_keywords = ['DEP TFR', 'UPI/CR', 'NEFT CR', 'RTGS CR', 'IMPS CR', 'SALARY', 'TRANSFER CR', '/CR/', 'CR/']
         total = 0.0
         for page_text in page_texts:
             for line in page_text.split("\n"):
@@ -441,7 +394,6 @@ class RobustTaxEngine:
             st.info(f"✅ Bank PDF parsed via Transaction Rows — Total Credits: ₹{total:,.2f}")
             return
 
-        # ── STRATEGY 4: Broad fallback ────────────────────────────────────────
         broad_total = 0.0
         for line in full_text.split("\n"):
             u = line.upper()
@@ -472,7 +424,6 @@ class RobustTaxEngine:
             else:
                 self.gross_receipts = float(df[cr_col].sum())
 
-    # ── STOCK LEDGER PARSER ──────────────────
     def parse_stock_ledger(self):
         if not self.ledger_file:
             return
@@ -516,12 +467,10 @@ class RobustTaxEngine:
             if col:
                 setattr(self, field, float(pd.to_numeric(df[col].astype(str).str.replace(",",""), errors='coerce').sum()))
 
-    # ── CORE TAX COMPUTE — AY 2026-27 CORRECTED ──
     def compute(self, route, regime="NEW"):
         has_business = self.gross_receipts > 0
         has_cg = any([self.stcg_111a, self.stcg_other, self.ltcg_112a, self.ltcg_other])
 
-        # ITR FORM SELECTION
         if self.has_foreign_assets or self.is_director_or_unlisted:
             itr_form = "ITR-3"
         elif has_cg:
@@ -541,7 +490,6 @@ class RobustTaxEngine:
             else:
                 itr_form = "ITR-1"
 
-        # INCOME AGGREGATION
         gross_total = (
             self.salary_income + self.presumptive_profit +
             self.stcg_111a + self.stcg_other +
@@ -550,7 +498,7 @@ class RobustTaxEngine:
         )
 
         if regime == "NEW":
-            net_taxable = max(0.0, gross_total)   # No Chapter VIA deductions in new regime
+            net_taxable = max(0.0, gross_total)
             standard_deduction = min(75_000, self.salary_income) if self.salary_income > 0 else 0
             net_taxable = max(0.0, net_taxable - standard_deduction)
         else:
@@ -558,11 +506,9 @@ class RobustTaxEngine:
             standard_deduction = min(50_000, self.salary_income) if self.salary_income > 0 else 0
             net_taxable = max(0.0, net_taxable - standard_deduction)
 
-        # SLAB INCOME (exclude special rate CG)
         special_cg = self.stcg_111a + self.stcg_other + self.ltcg_112a + self.ltcg_other
         slab_income = max(0.0, net_taxable - special_cg)
 
-        # SLAB TAX — AY 2026-27 NEW REGIME (Budget 2025 Updated Slabs)
         raw_slab_tax = 0.0
         if regime == "NEW":
             slabs = [(400000,0),(800000,0.05),(1200000,0.10),(1600000,0.15),(2000000,0.20),(float('inf'),0.30)]
@@ -576,7 +522,6 @@ class RobustTaxEngine:
                     break
             raw_slab_tax = running
         else:
-            # OLD REGIME
             if slab_income > 1_000_000:
                 raw_slab_tax = (slab_income - 1_000_000)*0.30 + 112500
             elif slab_income > 500_000:
@@ -584,26 +529,16 @@ class RobustTaxEngine:
             elif slab_income > 250_000:
                 raw_slab_tax = (slab_income - 250_000)*0.05
 
-        # CAPITAL GAINS TAX — POST BUDGET 2024 CORRECTED RATES
-        # Sec 111A STCG on listed equity: 20% (was 15%, changed Finance Act 2024)
         stcg_111a_tax  = self.stcg_111a * 0.20
-        # STCG other (debt, etc.): slab rate — already counted above via slab_income inclusion
-        stcg_other_tax = 0.0  # Included in slab income above
+        stcg_other_tax = 0.0
 
-        # Sec 112A LTCG listed equity: 12.5% above ₹1.25L exemption (Finance Act 2024)
         ltcg_112a_exempt = 125_000
         ltcg_112a_tax = max(0.0, (self.ltcg_112a - ltcg_112a_exempt) * 0.125) if self.ltcg_112a > ltcg_112a_exempt else 0.0
-
-        # LTCG other (debt): 12.5% no indexation (Finance Act 2024 change)
         ltcg_other_tax = self.ltcg_other * 0.125
 
         total_pre_rebate = raw_slab_tax + stcg_111a_tax + stcg_other_tax + ltcg_112a_tax + ltcg_other_tax
 
-        # SECTION 87A REBATE — AY 2026-27
-        # New Regime: rebate up to ₹25,000 if net taxable income ≤ ₹12,00,000
-        # Old Regime: rebate up to ₹12,500 if net taxable income ≤ ₹5,00,000
-        # NOTE: 87A NOT available on STCG 111A/112A special rate income
-        rebate_eligible_tax = raw_slab_tax  # Only slab tax qualifies
+        rebate_eligible_tax = raw_slab_tax
         if regime == "NEW":
             rebate = min(25_000, rebate_eligible_tax) if net_taxable <= 1_200_000 else 0.0
         else:
@@ -611,17 +546,14 @@ class RobustTaxEngine:
 
         net_tax = max(0.0, total_pre_rebate - rebate)
 
-        # SURCHARGE (simplified — no marginal relief here)
         surcharge = 0.0
         if net_taxable > 5_000_000:
             surcharge_rate = 0.10 if net_taxable <= 10_000_000 else (0.15 if net_taxable <= 20_000_000 else 0.25)
             surcharge = net_tax * surcharge_rate
 
-        # CESS: 4% on (tax + surcharge)
         cess = (net_tax + surcharge) * 0.04
         final_tax = round(net_tax + surcharge + cess, 2)
 
-        # AUDIT TRIGGER CHECK (44AB)
         audit_required = (
             (has_business and self.gross_receipts > 10_000_000) or
             (has_business and "44AD" in route and self.presumptive_profit < self.gross_receipts * 0.06) or
@@ -678,16 +610,13 @@ class GSTEngine:
         self.state           = "Telangana"
 
     def compute_gst_liability(self, rate_structure: dict):
-        """
-        rate_structure: {"0%": amt, "5%": amt, "12%": amt, "18%": amt, "28%": amt}
-        """
         gross_output_tax = 0.0
         breakdown = {}
         for rate_str, supply_val in rate_structure.items():
             rate = float(rate_str.replace("%","")) / 100
             tax = supply_val * rate
-            igst = tax  # Simplified — inter-state assumption
-            cgst = sgst = tax / 2  # Intra-state
+            igst = tax
+            cgst = sgst = tax / 2
             gross_output_tax += tax
             breakdown[rate_str] = {
                 "Taxable Value": round(supply_val, 2),
@@ -700,13 +629,11 @@ class GSTEngine:
         cash_liability  = max(0.0, net_gst_payable - self.tax_paid_cash)
         annual_turnover = sum(rate_structure.values()) + self.exempt_supply + self.export_supply
 
-        # Registration threshold check
-        reg_threshold  = 2_000_000  # ₹20L (regular)
-        comp_threshold = 15_000_000  # ₹1.5Cr for composition
+        reg_threshold  = 2_000_000
+        comp_threshold = 15_000_000
         reg_required   = annual_turnover >= reg_threshold
         comp_eligible  = annual_turnover <= comp_threshold and self.exempt_supply == 0
 
-        # GSTR filing calendar
         gstr_filing = {
             "GSTR-1 (Outward Supplies)": "11th of following month / Quarterly (QRMP)",
             "GSTR-3B (Summary Return)": "20th of following month",
@@ -735,770 +662,3 @@ class GSTEngine:
                 "Reverse Charge Applicable": "CHECK — Verify RCM applicability",
             }
         }
-
-# ─────────────────────────────────────────────
-#  PDF GENERATORS
-# ─────────────────────────────────────────────
-def generate_itr_pdf(name, pan, firm, result):
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40)
-    styles = getSampleStyleSheet()
-    story  = []
-
-    title_s = ParagraphStyle('T', parent=styles['Heading1'], fontSize=15,
-                              textColor=colors.HexColor("#1A365D"), spaceAfter=6)
-    h2_s    = ParagraphStyle('H2', parent=styles['Heading2'], fontSize=11,
-                              textColor=colors.HexColor("#2C5282"), spaceBefore=12, spaceAfter=4)
-    body_s  = ParagraphStyle('B', parent=styles['Normal'], fontSize=9, leading=13)
-    bold_s  = ParagraphStyle('Bo', parent=body_s, fontName='Helvetica-Bold')
-    small_s = ParagraphStyle('S', parent=styles['Normal'], fontSize=8, textColor=colors.HexColor("#666"))
-
-    # Header
-    story.append(Paragraph("KSP CONSOLE PLATFORM — Compliance Report", title_s))
-    story.append(Paragraph(f"Kulkarni Strategic Partners · {firm}", body_s))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E0"), spaceAfter=10))
-
-    meta = [
-        [Paragraph(f"<b>Assessee:</b> {name}", body_s), Paragraph(f"<b>AY:</b> 2026-27 (FY 2025-26)", body_s)],
-        [Paragraph(f"<b>PAN:</b> {pan}", body_s), Paragraph(f"<b>ITR Form:</b> {result['assigned_form']}", body_s)],
-        [Paragraph(f"<b>Regime:</b> {result['regime']} REGIME (Sec 115BAC)", body_s),
-         Paragraph(f"<b>Generated:</b> {datetime.now().strftime('%d %b %Y %H:%M')}", body_s)],
-    ]
-    t = Table(meta, colWidths=[265, 265])
-    t.setStyle(TableStyle([
-        ('GRID',(0,0),(-1,-1),0.5,colors.HexColor("#CBD5E0")),
-        ('PADDING',(0,0),(-1,-1),5),
-        ('BACKGROUND',(0,0),(-1,-1),colors.HexColor("#EDF2F7")),
-    ]))
-    story.append(t); story.append(Spacer(1,12))
-
-    # Income Metrics
-    story.append(Paragraph("I. Income Ingestion Summary", h2_s))
-    rows = [[Paragraph("<b>Field</b>",body_s), Paragraph("<b>Amount (INR)</b>",body_s)]]
-    for k,v in result["metrics"].items():
-        rows.append([Paragraph(k,body_s), Paragraph(f"₹ {v:,.2f}",body_s)])
-    t2 = Table(rows, colWidths=[370,160])
-    t2.setStyle(TableStyle([
-        ('BACKGROUND',(0,0),(-1,0),colors.HexColor("#EDF2F7")),
-        ('GRID',(0,0),(-1,-1),0.5,colors.HexColor("#CBD5E0")),
-        ('PADDING',(0,0),(-1,-1),4),
-    ]))
-    story.append(t2); story.append(Spacer(1,12))
-
-    # Tax Computation
-    story.append(Paragraph("II. Tax Computation Matrix", h2_s))
-    rows2 = [[Paragraph("<b>Component</b>",body_s), Paragraph("<b>Amount (INR)</b>",body_s)]]
-    for k,v in result["tax_breakdown"].items():
-        style = bold_s if "NET TAX" in k else body_s
-        rows2.append([Paragraph(f"<b>{k}</b>" if "NET TAX" in k else k, style), Paragraph(f"₹ {v:,.2f}", style)])
-    t3 = Table(rows2, colWidths=[370,160])
-    t3.setStyle(TableStyle([
-        ('BACKGROUND',(0,0),(-1,0),colors.HexColor("#EDF2F7")),
-        ('GRID',(0,0),(-1,-1),0.5,colors.HexColor("#CBD5E0")),
-        ('PADDING',(0,0),(-1,-1),4),
-        ('BACKGROUND',(0,-1),(-1,-1),colors.HexColor("#E2E8F0")),
-    ]))
-    story.append(t3); story.append(Spacer(1,12))
-
-    # Compliance Flags
-    story.append(Paragraph("III. Compliance Flags & Regulatory Triggers", h2_s))
-    for k,v in result["compliance_flags"].items():
-        story.append(Paragraph(f"<b>{k}:</b> {v}", body_s))
-        story.append(Spacer(1,3))
-    story.append(Spacer(1,10))
-
-    # E-Filing Steps
-    story.append(Paragraph("IV. Step-by-Step E-Filing Blueprint", h2_s))
-    net_tax = result['tax_breakdown']['NET TAX PAYABLE']
-    rebate  = result['tax_breakdown']['Section 87A Rebate']
-    steps = [
-        f"<b>Step 1 — Form Selection:</b> Login to incometax.gov.in → File ITR → AY 2026-27 → Select <b>{result['assigned_form']}</b>.",
-        f"<b>Step 2 — Regime:</b> Select <b>{result['regime']} REGIME</b> under Section 115BAC. Confirm regime before proceeding.",
-        f"<b>Step 3 — Schedule BP:</b> Enter Gross Receipts: <b>₹ {result['metrics']['Gross Receipts / Turnover']:,.2f}</b> | Presumptive Profit: <b>₹ {result['metrics']['Presumptive Profit (Sec 44AD/44ADA)']:,.2f}</b>",
-        f"<b>Step 4 — Schedule CG:</b> Sec 111A STCG: <b>₹ {result['metrics']['STCG — Sec 111A (Listed Equity, 20%)']:,.2f}</b> @ 20% | Sec 112A LTCG: <b>₹ {result['metrics']['LTCG — Sec 112A (Listed Equity, 12.5%)']:,.2f}</b> @ 12.5%",
-        f"<b>Step 5 — Part B-TTI:</b> Verify Sec 87A Rebate: <b>₹ {rebate:,.2f}</b> | Final Net Tax: <b>₹ {net_tax:,.2f}</b>",
-        "<b>Step 6 — Pre-Submit:</b> Cross-verify with Form 26AS and AIS. Ensure all TDS credits are matched.",
-        "<b>Step 7 — E-Verify:</b> Submit → Preview → E-Verify via Aadhaar OTP or Net Banking within 30 days.",
-    ]
-    for s in steps:
-        story.append(Paragraph(s, body_s))
-        story.append(Spacer(1,4))
-
-    story.append(Spacer(1,15))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#CBD5E0")))
-    story.append(Paragraph("Disclaimer: This report is generated by KSP Console Platform for professional reference only. Verify all figures with source documents before filing.", small_s))
-
-    doc.build(story)
-    buf.seek(0)
-    return buf.getvalue()
-
-
-def generate_gst_pdf(name, gstin, firm, result):
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=40, rightMargin=40, topMargin=40, bottomMargin=40)
-    styles = getSampleStyleSheet()
-    story  = []
-
-    title_s = ParagraphStyle('T', parent=styles['Heading1'], fontSize=14, textColor=colors.HexColor("#1A365D"), spaceAfter=6)
-    h2_s    = ParagraphStyle('H2', parent=styles['Heading2'], fontSize=11, textColor=colors.HexColor("#2C5282"), spaceBefore=12, spaceAfter=4)
-    body_s  = ParagraphStyle('B', parent=styles['Normal'], fontSize=9, leading=13)
-
-    story.append(Paragraph("KSP CONSOLE PLATFORM — GST Compliance Report", title_s))
-    story.append(Paragraph(f"Kulkarni Strategic Partners · {firm}", body_s))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E0"), spaceAfter=10))
-
-    meta = [
-        [Paragraph(f"<b>Business Name:</b> {name}", body_s), Paragraph(f"<b>GSTIN:</b> {gstin}", body_s)],
-        [Paragraph(f"<b>Annual Turnover:</b> ₹ {result['annual_turnover']:,.2f}", body_s),
-         Paragraph(f"<b>Registration:</b> {result['compliance_flags']['GST Registration']}", body_s)],
-    ]
-    t = Table(meta, colWidths=[265, 265])
-    t.setStyle(TableStyle([('GRID',(0,0),(-1,-1),0.5,colors.HexColor("#CBD5E0")),
-                            ('PADDING',(0,0),(-1,-1),5),
-                            ('BACKGROUND',(0,0),(-1,-1),colors.HexColor("#EDF2F7"))]))
-    story.append(t); story.append(Spacer(1,12))
-
-    story.append(Paragraph("I. GST Liability Summary", h2_s))
-    rows = [[Paragraph("<b>Component</b>",body_s), Paragraph("<b>Amount (INR)</b>",body_s)]]
-    for k,v in result["summary"].items():
-        rows.append([Paragraph(k,body_s), Paragraph(f"₹ {v:,.2f}",body_s)])
-    t2 = Table(rows, colWidths=[370,160])
-    t2.setStyle(TableStyle([
-        ('BACKGROUND',(0,0),(-1,0),colors.HexColor("#EDF2F7")),
-        ('GRID',(0,0),(-1,-1),0.5,colors.HexColor("#CBD5E0")),
-        ('PADDING',(0,0),(-1,-1),4),
-    ]))
-    story.append(t2); story.append(Spacer(1,10))
-
-    story.append(Paragraph("II. GSTR Filing Calendar", h2_s))
-    for form, due in result["gstr_calendar"].items():
-        story.append(Paragraph(f"<b>{form}:</b> {due}", body_s))
-        story.append(Spacer(1,3))
-
-    doc.build(story)
-    buf.seek(0)
-    return buf.getvalue()
-
-# ─────────────────────────────────────────────
-#  MODULE: ITR FILING ENGINE
-# ─────────────────────────────────────────────
-def render_itr_module(user):
-    st.markdown('<div class="section-header">Active Client Configuration</div>', unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        name = st.text_input("Client Legal Name", placeholder="e.g. Dixith Chakravarthula")
-        pan  = st.text_input("PAN Number", placeholder="ABCDE1234F", max_chars=10)
-    with c2:
-        salary   = st.number_input("Salary Income (₹)", min_value=0.0, step=1000.0, format="%.2f")
-        other_inc= st.number_input("Other Sources Income (₹)", min_value=0.0, step=1000.0, format="%.2f")
-    with c3:
-        deductions = st.number_input("Chapter VIA Deductions (₹) [Old Regime]", min_value=0.0, step=1000.0, format="%.2f")
-        regime     = st.selectbox("Tax Regime", ["NEW (Sec 115BAC)", "OLD (Regular)"])
-
-    st.markdown('<div class="section-header">Business Route & Flags</div>', unsafe_allow_html=True)
-    cf1, cf2, cf3 = st.columns(3)
-    with cf1:
-        route = st.radio("Filing Route:", [
-            "Small Business / Trade (Sec 44AD)",
-            "Professional / Freelance (Sec 44ADA)",
-            "None (Salaried / Passive Only)"
-        ])
-    with cf2:
-        d_flag = st.checkbox("Director / Holds Unlisted Equity")
-        f_flag = st.checkbox("Foreign Assets / Foreign Accounts")
-        a_flag = st.checkbox("Agricultural Income > ₹5,000")
-    with cf3:
-        profile_model = st.selectbox("Client Profile Model", [
-            "Salaried Professional",
-            "Traditional Professional / Priest (Dakshina & Pooja Inflows)",
-            "Freelancer / Consultant",
-            "Small Retailer / Trader",
-            "Investor (Equity & MF)",
-            "HUF",
-            "NRI / Foreign Income",
-        ])
-
-    st.markdown('<div class="section-header">Document Ingestion</div>', unsafe_allow_html=True)
-    fc1, fc2, fc3 = st.columns(3)
-    with fc1: b_file = st.file_uploader("Bank Statement", type=["csv","xlsx","xls","pdf"], key="itr_bank")
-    with fc2: a_file = st.file_uploader("AIS / 26AS Document", type=["csv","xlsx","pdf"], key="itr_ais")
-    with fc3: l_file = st.file_uploader("Stock P&L Ledger", type=["csv","xlsx","pdf"], key="itr_ledger")
-
-    # ── STEP 1: PARSE & PREVIEW ───────────────────────────────────────────────
-    st.markdown('<div class="section-header">Step 1 — Parse Documents & Verify Figures</div>', unsafe_allow_html=True)
-    if st.button("🔍  Parse Documents & Preview Extracted Figures", use_container_width=True):
-        if not b_file and not l_file:
-            st.warning("⚠️ Upload at least one document to parse.")
-        else:
-            with st.spinner("Parsing documents..."):
-                _engine = RobustTaxEngine(bank_file=b_file, ledger_file=l_file)
-                _engine.parse_bank_statement()
-                _engine.parse_stock_ledger()
-                st.session_state["parsed_gross"]    = _engine.gross_receipts
-                st.session_state["parsed_stcg111a"] = _engine.stcg_111a
-                st.session_state["parsed_ltcg112a"] = _engine.ltcg_112a
-
-    # Show parsed preview + allow override
-    if "parsed_gross" in st.session_state:
-        st.markdown("""
-        <div class="ksp-card ksp-card-accent" style="margin-bottom:0.75rem;">
-        <b>Parsed values — verify and correct if needed before computing tax</b>
-        </div>""", unsafe_allow_html=True)
-        ov1, ov2, ov3 = st.columns(3)
-        with ov1:
-            override_gross = st.number_input(
-                "✏️ Gross Receipts / Total Credits (₹)",
-                value=float(st.session_state.get("parsed_gross", 0.0)),
-                min_value=0.0, step=100.0, format="%.2f",
-                key="override_gross",
-                help="Auto-parsed from bank statement. Correct if wrong."
-            )
-        with ov2:
-            override_stcg = st.number_input(
-                "✏️ STCG — Sec 111A (₹)",
-                value=float(st.session_state.get("parsed_stcg111a", 0.0)),
-                min_value=0.0, step=100.0, format="%.2f",
-                key="override_stcg",
-                help="Auto-parsed from stock ledger."
-            )
-        with ov3:
-            override_ltcg = st.number_input(
-                "✏️ LTCG — Sec 112A (₹)",
-                value=float(st.session_state.get("parsed_ltcg112a", 0.0)),
-                min_value=0.0, step=100.0, format="%.2f",
-                key="override_ltcg",
-                help="Auto-parsed from stock ledger."
-            )
-    else:
-        st.markdown("""
-        <div class="ksp-card" style="font-size:0.82rem;color:#8B949E;margin-bottom:0.5rem;">
-        Upload documents and click <b>Parse Documents</b> above to auto-fill figures,
-        or enter them manually below and proceed directly to compute.
-        </div>""", unsafe_allow_html=True)
-        ov1, ov2, ov3 = st.columns(3)
-        with ov1:
-            override_gross = st.number_input("Gross Receipts / Total Bank Credits (₹)",
-                min_value=0.0, step=100.0, format="%.2f", key="override_gross")
-        with ov2:
-            override_stcg = st.number_input("STCG — Sec 111A (₹)",
-                min_value=0.0, step=100.0, format="%.2f", key="override_stcg")
-        with ov3:
-            override_ltcg = st.number_input("LTCG — Sec 112A (₹)",
-                min_value=0.0, step=100.0, format="%.2f", key="override_ltcg")
-
-    # ── STEP 2: COMPUTE TAX ───────────────────────────────────────────────────
-    st.markdown('<div class="section-header">Step 2 — Compute Tax & Generate Report</div>', unsafe_allow_html=True)
-    st.markdown("")
-    if st.button("🚀  Execute Tax Computation & Generate PDF", use_container_width=True):
-        if not name or not pan:
-            st.warning("⚠️ Enter Client Name and PAN to proceed.")
-            return
-
-        with st.spinner("Running compliance matrix..."):
-            time.sleep(0.3)
-            engine = RobustTaxEngine(bank_file=None, ledger_file=None)
-            # Use verified/overridden values — not raw parse
-            engine.gross_receipts          = float(st.session_state.get("override_gross", override_gross))
-            engine.stcg_111a               = float(st.session_state.get("override_stcg", override_stcg))
-            engine.ltcg_112a               = float(st.session_state.get("override_ltcg", override_ltcg))
-            engine.salary_income           = salary
-            engine.other_sources_income    = other_inc
-            engine.total_deductions        = deductions
-            engine.is_director_or_unlisted = d_flag
-            engine.has_foreign_assets      = f_flag
-            engine.has_agri_over_5k        = a_flag
-
-            regime_key = "NEW" if "NEW" in regime else "OLD"
-            result = engine.compute(route, regime_key)
-            st.session_state.last_itr_result = result
-
-            pdf_bytes = generate_itr_pdf(name, pan, user["firm"], result)
-            st.session_state.itr_pdf_bytes    = pdf_bytes
-            st.session_state.itr_pdf_filename = f"KSP_ITR_{pan}_AY2627.pdf"
-
-        st.success(f"✅ Compliance framework generated for **{name}** | Profile: {profile_model}")
-
-        m1, m2, m3, m4, m5 = st.columns(5)
-        m1.metric("ITR Form",            result["assigned_form"])
-        m2.metric("Gross Receipts",      f"₹{result['metrics']['Gross Receipts / Turnover']:,.0f}")
-        m3.metric("Net Taxable Income",  f"₹{result['metrics']['Net Taxable Income']:,.0f}")
-        m4.metric("NET TAX PAYABLE",     f"₹{result['tax_breakdown']['NET TAX PAYABLE']:,.0f}")
-        m5.metric("Sec 44AB Audit",      result["compliance_flags"]["Sec 44AB Audit Required"])
-
-        st.markdown("---")
-        t1, t2, t3 = st.tabs(["📊 Income Metrics", "⚖️ Tax Breakdown", "🚩 Compliance Flags"])
-        with t1: st.json(result["metrics"])
-        with t2: st.json(result["tax_breakdown"])
-        with t3: st.json(result["compliance_flags"])
-
-    if st.session_state.itr_pdf_bytes:
-        st.markdown("---")
-        st.download_button(
-            "📥  Download Certified Compliance Report (PDF)",
-            data=st.session_state.itr_pdf_bytes,
-            file_name=st.session_state.itr_pdf_filename,
-            mime="application/pdf",
-            use_container_width=True
-        )
-
-# ─────────────────────────────────────────────
-#  MODULE: GST COMMAND CENTER
-# ─────────────────────────────────────────────
-def render_gst_module(user):
-    st.markdown('<div class="section-header">GST Entity Profile</div>', unsafe_allow_html=True)
-    g1, g2, g3 = st.columns(3)
-    with g1:
-        biz_name  = st.text_input("Business / Trade Name", placeholder="e.g. KSP Enterprises")
-        gstin     = st.text_input("GSTIN (if registered)", placeholder="29ABCDE1234F1Z5", max_chars=15)
-    with g2:
-        state     = st.selectbox("State of Registration", ["Telangana","Karnataka","Maharashtra","Tamil Nadu","Delhi","Gujarat","Other"])
-        biz_type  = st.selectbox("Business Category", ["Regular Taxpayer","Composition Dealer","E-Commerce Operator","Export / SEZ","Input Service Distributor"])
-    with g3:
-        itc_avail = st.number_input("ITC Available (₹)", min_value=0.0, step=100.0, format="%.2f")
-        cash_paid = st.number_input("Tax Already Paid via Cash Ledger (₹)", min_value=0.0, step=100.0, format="%.2f")
-
-    st.markdown('<div class="section-header">Supply Breakup by GST Rate</div>', unsafe_allow_html=True)
-    sr1, sr2, sr3, sr4, sr5, sr6, sr7 = st.columns(7)
-    supply_0   = sr1.number_input("0% (Exempt)", min_value=0.0, step=1000.0, format="%.2f")
-    supply_5   = sr2.number_input("5%", min_value=0.0, step=1000.0, format="%.2f")
-    supply_12  = sr3.number_input("12%", min_value=0.0, step=1000.0, format="%.2f")
-    supply_18  = sr4.number_input("18%", min_value=0.0, step=1000.0, format="%.2f")
-    supply_28  = sr5.number_input("28%", min_value=0.0, step=1000.0, format="%.2f")
-    export_sup = sr6.number_input("Export (0%)", min_value=0.0, step=1000.0, format="%.2f")
-    exempt_sup = sr7.number_input("Pure Exempt", min_value=0.0, step=1000.0, format="%.2f")
-
-    if st.button("📊  Compute GST Liability & Filing Calendar", use_container_width=True):
-        if not biz_name:
-            st.warning("⚠️ Enter business name.")
-            return
-
-        with st.spinner("Processing GST matrix..."):
-            time.sleep(0.3)
-            gst = GSTEngine()
-            gst.itc_claimed    = itc_avail
-            gst.tax_paid_cash  = cash_paid
-            gst.export_supply  = export_sup
-            gst.exempt_supply  = exempt_sup
-            gst.state          = state
-
-            rate_struct = {"0%": supply_0, "5%": supply_5, "12%": supply_12, "18%": supply_18, "28%": supply_28}
-            result = gst.compute_gst_liability(rate_struct)
-            st.session_state.last_gst_result = result
-
-            pdf_bytes = generate_gst_pdf(biz_name, gstin or "UNREGISTERED", user["firm"], result)
-            st.session_state.gst_pdf_bytes = pdf_bytes
-
-        st.success(f"✅ GST computation complete for **{biz_name}**")
-
-        gm1, gm2, gm3, gm4 = st.columns(4)
-        gm1.metric("Annual Turnover",     f"₹{result['annual_turnover']:,.0f}")
-        gm2.metric("Gross Output Tax",    f"₹{result['summary']['Gross Output Tax']:,.0f}")
-        gm3.metric("Net GST Payable",     f"₹{result['summary']['Net GST Payable']:,.0f}")
-        gm4.metric("Cash Liability",      f"₹{result['summary']['Cash Ledger Requirement']:,.0f}")
-
-        st.markdown("---")
-        gt1, gt2, gt3 = st.tabs(["📋 Rate-wise Breakdown","📊 Summary","📅 Filing Calendar"])
-        with gt1: st.json(result["rate_breakdown"])
-        with gt2: st.json(result["summary"])
-        with gt3: st.json(result["gstr_calendar"])
-
-    if st.session_state.get("gst_pdf_bytes"):
-        st.markdown("---")
-        st.download_button(
-            "📥  Download GST Compliance Report (PDF)",
-            data=st.session_state.gst_pdf_bytes,
-            file_name=f"KSP_GST_{(gstin or 'UNREG')}.pdf",
-            mime="application/pdf",
-            use_container_width=True
-        )
-
-# ─────────────────────────────────────────────
-#  MODULE: AI COMPLIANCE AGENT (KSP AI)
-# ─────────────────────────────────────────────
-def render_ai_agent_module(user):
-    st.markdown("""
-    <div class="info-box">
-    ⚡ <b>KSP AI Compliance & Filing Agent</b> — Powered by Google Gemini API.
-    Ask natural language questions about ITR, GST, TDS, AIS, or upload documents for AI-driven analysis.
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="section-header">Active Client Context</div>', unsafe_allow_html=True)
-    ac1, ac2 = st.columns(2)
-    with ac1:
-        client_name    = st.text_input("Client Name (context)", placeholder="Dixith Chakravarthula")
-        profile_model  = st.selectbox("Profile Model", [
-            "Traditional Professional / Priest (Dakshina & Pooja Inflows)",
-            "Salaried Professional", "Freelancer / Consultant",
-            "Small Retailer", "Investor", "NRI"
-        ])
-    with ac2:
-        connected_pipe = st.text_input("Connected Financial Pipeline Note", placeholder="e.g. Ledger text loaded from bank PDF")
-        regime_sel     = st.selectbox("Preferred Regime for Analysis", ["NEW Regime (Sec 115BAC)", "OLD Regime"])
-
-    st.markdown('<div class="section-header">Master Calculation Prompts / Directives</div>', unsafe_allow_html=True)
-    user_prompt = st.text_area(
-        "Enter your compliance query or directive:",
-        height=120,
-        placeholder="e.g. Perform parallel computing for both Standard Compliance and Credit Optimization layouts for Mr. Dixith Chakravarthula. Determine the exact recommended option based on audit protection rules."
-    )
-
-    if st.button("⚡  Execute Dual-Route Financial Synthesis", use_container_width=True):
-        if not user_prompt.strip():
-            st.warning("⚠️ Enter a directive to proceed.")
-            return
-
-        system_prompt = f"""You are KSP AI, an expert Indian tax and compliance assistant for AY 2026-27 (FY 2025-26).
-You work for Kulkarni Strategic Partners, a professional B2B tax consultancy.
-Current client: {client_name or 'Unknown'} | Profile: {profile_model} | Regime preference: {regime_sel}
-Connected pipeline note: {connected_pipe or 'None'}
-
-You must provide precise, actionable compliance guidance. Always reference:
-- Correct ITR form selection logic (ITR-1 through ITR-6)
-- AY 2026-27 tax slabs (New Regime: ₹0-4L: 0%, 4-8L: 5%, 8-12L: 10%, 12-16L: 15%, 16-20L: 20%, >20L: 30%)
-- Post Finance Act 2024 capital gains rates (STCG 111A: 20%, LTCG 112A: 12.5%, exemption ₹1.25L)
-- Section 87A rebate: ₹25,000 if income ≤ ₹12L (New Regime)
-- GST thresholds and GSTR filing deadlines
-- TDS provisions, Form 26AS cross-verification
-- Sec 44AD / 44ADA presumptive scheme limits and conditions
-Respond in a structured, professional format with clear sections and action items."""
-
-        # ── GOOGLE GEMINI API CALL ──────────────────
-        import urllib.request
-
-        GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
-        if not GEMINI_API_KEY:
-            st.error("⚠️ GEMINI_API_KEY not found. Add it to Streamlit Secrets or environment variables.")
-            return
-
-        # Combine system prompt + user prompt as Gemini uses a single contents array
-        combined_prompt = f"{system_prompt}\n\n---\n\nUser Query:\n{user_prompt}"
-
-        payload = json.dumps({
-            "contents": [
-                {
-                    "parts": [{"text": combined_prompt}],
-                    "role": "user"
-                }
-            ],
-            "generationConfig": {
-                "maxOutputTokens": 1500,
-                "temperature": 0.3,
-            }
-        }).encode()
-
-        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-
-        req = urllib.request.Request(
-            gemini_url,
-            data=payload,
-            headers={"Content-Type": "application/json"},
-            method="POST"
-        )
-
-        with st.spinner("KSP AI processing directive..."):
-            try:
-                with urllib.request.urlopen(req, timeout=30) as resp:
-                    data = json.loads(resp.read().decode())
-                    # Gemini response structure: candidates[0].content.parts[0].text
-                    ai_response = data["candidates"][0]["content"]["parts"][0]["text"]
-
-                st.markdown("""
-                <div class="ksp-card ksp-card-success">
-                <div class="section-header" style="margin-top:0">AI Compliance Response</div>
-                """, unsafe_allow_html=True)
-                st.markdown(ai_response)
-                st.markdown("</div>", unsafe_allow_html=True)
-
-                # Show pipeline status
-                if client_name:
-                    st.markdown(f"""
-                    <div class="ksp-card ksp-card-accent" style="margin-top:0.5rem; font-size:0.82rem;">
-                    🔗 <b>Connected Financial Master Pipeline Active</b>: {connected_pipe or 'Manual input mode'}<br/>
-                    • Active Client: <b>{client_name}</b> &nbsp;|&nbsp; • Profile Model: <b>{profile_model}</b>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-            except urllib.error.HTTPError as e:
-                err_body = e.read().decode()
-                st.error(f"Strategy Parallel Processing Error: {e.code} {e.reason}. {err_body}")
-            except Exception as e:
-                st.error(f"Strategy Parallel Processing Error: {str(e)}")
-
-# ─────────────────────────────────────────────
-#  MODULE: BUSINESS INCORPORATION MATRIX
-# ─────────────────────────────────────────────
-def render_incorporation_module(user):
-    st.markdown("""
-    <div class="info-box">
-    📋 <b>Business Incorporation Strategy Matrix</b> — Compares entity structures (Pvt Ltd, LLP, OPC, Sole Prop, Partnership) 
-    across tax, compliance, liability, and cost vectors for AY 2026-27.
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="section-header">Entity Profiling Parameters</div>', unsafe_allow_html=True)
-    i1, i2, i3 = st.columns(3)
-    with i1:
-        promoter_count = st.number_input("Number of Promoters/Partners", min_value=1, max_value=200, value=2)
-        annual_revenue = st.number_input("Projected Annual Revenue (₹)", min_value=0.0, step=100000.0, format="%.0f")
-    with i2:
-        foreign_inv    = st.checkbox("Requires Foreign Investment (FDI)")
-        listed_plans   = st.checkbox("Plans to list on Stock Exchange (IPO)")
-        vc_funding      = st.checkbox("Seeking VC / Angel Funding")
-    with i3:
-        sector         = st.selectbox("Business Sector", ["IT / Software Services","Manufacturing","Trading","Professional Services","E-Commerce","Healthcare","Other"])
-        state_reg      = st.selectbox("State of Incorporation", ["Telangana","Karnataka","Maharashtra","Delhi","Tamil Nadu","Other"])
-
-    if st.button("📊  Generate Incorporation Strategy Matrix", use_container_width=True):
-        with st.spinner("Computing entity comparison matrix..."):
-            time.sleep(0.3)
-
-        entities = {
-            "Private Limited Company": {
-                "Tax Rate": "22% (Sec 115BAA) + Surcharge + 4% Cess",
-                "Liability": "Limited to shareholding",
-                "Compliance Load": "HIGH — ROC filings, board meetings, statutory audit mandatory",
-                "FDI Eligible": "YES ✅",
-                "Min Capital": "No minimum (post-2015)",
-                "Recommended If": "VC funding, FDI, IPO track, >2 founders",
-                "Estimated Annual Compliance Cost": "₹40,000 – ₹1,20,000",
-            },
-            "LLP (Limited Liability Partnership)": {
-                "Tax Rate": "30% flat + 4% Cess (no MAT)",
-                "Liability": "Limited",
-                "Compliance Load": "MEDIUM — Annual return + statement of accounts",
-                "FDI Eligible": "Limited (Automatic route restricted for some sectors)",
-                "Min Capital": "No minimum",
-                "Recommended If": "Professional firms, 2+ partners, moderate compliance tolerance",
-                "Estimated Annual Compliance Cost": "₹15,000 – ₹40,000",
-            },
-            "One Person Company (OPC)": {
-                "Tax Rate": "22% + Surcharge + 4% Cess",
-                "Liability": "Limited",
-                "Compliance Load": "MEDIUM",
-                "FDI Eligible": "NO (single Indian resident only)",
-                "Min Capital": "No minimum",
-                "Recommended If": "Solo founder, wants corporate shield, revenue < ₹2Cr",
-                "Estimated Annual Compliance Cost": "₹20,000 – ₹50,000",
-            },
-            "Sole Proprietorship": {
-                "Tax Rate": "Individual slab rates (up to 30%)",
-                "Liability": "UNLIMITED — Personal assets at risk",
-                "Compliance Load": "LOW — ITR-3/4, GST if applicable",
-                "FDI Eligible": "NO",
-                "Min Capital": "None",
-                "Recommended If": "Very small business, single person, minimal risk exposure",
-                "Estimated Annual Compliance Cost": "₹5,000 – ₹15,000",
-            },
-            "Partnership Firm": {
-                "Tax Rate": "30% flat + 4% Cess",
-                "Liability": "UNLIMITED (unless LLP)",
-                "Compliance Load": "LOW-MEDIUM",
-                "FDI Eligible": "NO",
-                "Min Capital": "None",
-                "Recommended If": "Family business, traditional trade, avoid corporate formalities",
-                "Estimated Annual Compliance Cost": "₹10,000 – ₹25,000",
-            }
-        }
-
-        st.markdown('<div class="section-header">Entity Comparison Matrix</div>', unsafe_allow_html=True)
-        for entity, details in entities.items():
-            with st.expander(f"🏢 {entity}"):
-                ec1, ec2 = st.columns(2)
-                for i, (k, v) in enumerate(details.items()):
-                    (ec1 if i % 2 == 0 else ec2).markdown(f"**{k}:** {v}")
-
-        if foreign_inv or vc_funding or listed_plans:
-            st.markdown("""
-            <div class="ksp-card ksp-card-warning">
-            ⭐ <b>Recommendation:</b> Given FDI/VC/IPO requirements, <b>Private Limited Company</b> is the only viable structure. 
-            Register under Companies Act 2013 via MCA portal. Ensure MOA/AOA drafted with appropriate objects clause.
-            </div>
-            """, unsafe_allow_html=True)
-        elif promoter_count == 1:
-            st.markdown("""
-            <div class="ksp-card ksp-card-accent">
-            ⭐ <b>Recommendation:</b> Single promoter — consider <b>OPC</b> for corporate liability protection with lower compliance vs Pvt Ltd. 
-            If revenue < ₹40L, Sole Proprietorship with ITR-4 (44AD) is simpler.
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div class="ksp-card ksp-card-success">
-            ⭐ <b>Recommendation:</b> For professional services with multiple partners, <b>LLP</b> offers optimal balance of 
-            liability protection, compliance cost, and pass-through flexibility.
-            </div>
-            """, unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-#  MODULE: PREDICTIVE CFO MODELING
-# ─────────────────────────────────────────────
-def render_cfo_module(user):
-    st.markdown("""
-    <div class="info-box">
-    📈 <b>Predictive Fractional CFO Modeling</b> — Advance tax planning, cashflow projection, and 
-    installment scheduling for AY 2026-27.
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown('<div class="section-header">Income Projection Inputs</div>', unsafe_allow_html=True)
-    p1, p2, p3 = st.columns(3)
-    with p1:
-        proj_revenue   = st.number_input("Projected Annual Revenue (₹)", min_value=0.0, step=50000.0, format="%.0f", value=2500000.0)
-        proj_expenses  = st.number_input("Estimated Business Expenses (₹)", min_value=0.0, step=10000.0, format="%.0f", value=800000.0)
-    with p2:
-        proj_salary    = st.number_input("Salary / Fixed Income (₹)", min_value=0.0, step=10000.0, format="%.0f")
-        proj_invest    = st.number_input("Expected Capital Gains (₹)", min_value=0.0, step=10000.0, format="%.0f")
-    with p3:
-        tds_deducted   = st.number_input("TDS Already Deducted (₹)", min_value=0.0, step=1000.0, format="%.0f")
-        advance_paid   = st.number_input("Advance Tax Already Paid (₹)", min_value=0.0, step=1000.0, format="%.0f")
-
-    if st.button("📈  Generate Advance Tax Schedule & CFO Forecast", use_container_width=True):
-        with st.spinner("Computing advance tax schedule..."):
-            time.sleep(0.3)
-
-        # Simplified tax estimate
-        net_income = max(0, proj_revenue - proj_expenses + proj_salary + proj_invest)
-        # New regime slab (simplified)
-        if net_income <= 400000:     est_tax = 0
-        elif net_income <= 800000:   est_tax = (net_income - 400000) * 0.05
-        elif net_income <= 1200000:  est_tax = 20000 + (net_income - 800000) * 0.10
-        elif net_income <= 1600000:  est_tax = 60000 + (net_income - 1200000) * 0.15
-        elif net_income <= 2000000:  est_tax = 120000 + (net_income - 1600000) * 0.20
-        else:                        est_tax = 200000 + (net_income - 2000000) * 0.30
-        est_tax_with_cess = est_tax * 1.04
-        net_tax_after_tds = max(0, est_tax_with_cess - tds_deducted - advance_paid)
-
-        # Advance tax installments (Sec 208/209)
-        installments = {
-            "1st Installment (by 15 Jun 2025)": max(0, est_tax_with_cess * 0.15),
-            "2nd Installment (by 15 Sep 2025)": max(0, est_tax_with_cess * 0.45 - est_tax_with_cess * 0.15),
-            "3rd Installment (by 15 Dec 2025)": max(0, est_tax_with_cess * 0.75 - est_tax_with_cess * 0.45),
-            "4th Installment (by 15 Mar 2026)": max(0, est_tax_with_cess - est_tax_with_cess * 0.75),
-        }
-
-        am1, am2, am3, am4 = st.columns(4)
-        am1.metric("Projected Net Income",    f"₹{net_income:,.0f}")
-        am2.metric("Estimated Tax (with cess)", f"₹{est_tax_with_cess:,.0f}")
-        am3.metric("TDS + Advance Paid",       f"₹{tds_deducted + advance_paid:,.0f}")
-        am4.metric("Balance Tax Payable",      f"₹{net_tax_after_tds:,.0f}")
-
-        st.markdown('<div class="section-header">Advance Tax Installment Schedule (Sec 208)</div>', unsafe_allow_html=True)
-        for inst, amt in installments.items():
-            col_a, col_b = st.columns([3,1])
-            col_a.markdown(f"**{inst}**")
-            col_b.markdown(f"₹ {amt:,.0f}")
-
-        if net_tax_after_tds > 10_000:
-            st.markdown(f"""
-            <div class="ksp-card ksp-card-warning">
-            ⚠️ <b>Advance Tax Alert:</b> Balance of ₹{net_tax_after_tds:,.0f} is payable. 
-            Failure to pay advance tax attracts interest under Sec 234B (1% p.m.) and Sec 234C (1% p.m. per installment shortfall).
-            Immediate action recommended.
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div class="ksp-card ksp-card-success">
-            ✅ <b>Advance Tax:</b> TDS + advance payments appear adequate. Verify final figures with actual P&L at year-end.
-            </div>
-            """, unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-#  SIDEBAR — Module Navigator
-# ─────────────────────────────────────────────
-def render_sidebar(user):
-    with st.sidebar:
-        st.markdown("""
-        <div style="padding:0.75rem 0; border-bottom:1px solid #30363D; margin-bottom:1rem;">
-            <div style="font-family:'IBM Plex Mono';font-size:1rem;font-weight:700;color:#58A6FF;">⚙️ KSP CONSOLE</div>
-            <div style="font-size:0.72rem;color:#8B949E;margin-top:2px;">PLATFORM</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        modules = [
-            ("itr",   "🚀 High-Value Smart ITR Filing Engine"),
-            ("gst",   "🔵 GST Command Center Core"),
-            ("ai",    "🌐 KSP AI Compliance & Filing Agent"),
-            ("incorp","📋 Business Incorporation Strategy Matrix"),
-            ("cfo",   "📈 Predictive Fractional CFO Modeling"),
-        ]
-
-        st.markdown('<div style="font-size:0.7rem;color:#8B949E;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:0.5rem;">Choose functional module to execute:</div>', unsafe_allow_html=True)
-
-        for key, label in modules:
-            accessible = has_module_access(user["modules"], key)
-            if accessible:
-                if st.button(label, key=f"mod_{key}", use_container_width=True):
-                    st.session_state.active_module = key
-                    st.rerun()
-            else:
-                st.markdown(f'<div style="color:#484F58;font-size:0.82rem;padding:0.3rem 0;">🔒 {label}</div>', unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.markdown(f"""
-        <div style="font-size:0.72rem;color:#8B949E;line-height:1.8;">
-        <b style="color:#C9D1D9;">Firm:</b> {user['firm']}<br/>
-        <b style="color:#C9D1D9;">Plan:</b> <span style="color:#3FB950;">{user['plan']}</span><br/>
-        <b style="color:#C9D1D9;">User:</b> {user['username']}<br/>
-        <b style="color:#C9D1D9;">AY:</b> 2026-27 (FY 2025-26)
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.markdown('<div style="font-size:0.7rem;color:#8B949E;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.4rem;">Architecture Framework: Unified Matrix Master v3.0</div>', unsafe_allow_html=True)
-        st.markdown('<div style="font-size:0.7rem;color:#3FB950;">🔒 Security Mode: Active</div>', unsafe_allow_html=True)
-        st.markdown("")
-
-        if st.button("⎋  Logout", use_container_width=True):
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-            st.rerun()
-
-# ─────────────────────────────────────────────
-#  MAIN APP CONTROLLER
-# ─────────────────────────────────────────────
-def render_main(user):
-    render_sidebar(user)
-
-    # Brand header bar
-    module_titles = {
-        "itr":   ("🚀", "High-Value Smart ITR Filing Engine", "AY 2026-27 | Sec 44AD/44ADA | New & Old Regime | Post Finance Act 2024"),
-        "gst":   ("🔵", "GST Command Center Core", "Output Tax | ITC | GSTR Calendar | Registration Compliance"),
-        "ai":    ("🌐", "KSP AI Compliance & Filing Agent", "Claude-powered natural language compliance assistant"),
-        "incorp":("📋", "Business Incorporation Strategy Matrix", "Pvt Ltd | LLP | OPC | Partnership | Proprietorship"),
-        "cfo":   ("📈", "Predictive Fractional CFO Modeling", "Advance Tax Schedule | Sec 208/234 | Cashflow Forecast"),
-    }
-    mod = st.session_state.active_module
-    icon, title, subtitle = module_titles.get(mod, ("⚙️", "Module", ""))
-
-    st.markdown(f"""
-    <div class="brand-bar">
-        <div class="logo">{icon}</div>
-        <div>
-            <div class="title">{title}</div>
-            <div class="subtitle">{subtitle}</div>
-        </div>
-        <div class="status-badge">● LIVE</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Module router
-    if mod == "itr":
-        render_itr_module(user)
-    elif mod == "gst":
-        render_gst_module(user)
-    elif mod == "ai":
-        render_ai_agent_module(user)
-    elif mod == "incorp":
-        render_incorporation_module(user)
-    elif mod == "cfo":
-        render_cfo_module(user)
-
-# ─────────────────────────────────────────────
-#  ENTRYPOINT
-# ─────────────────────────────────────────────
-if not st.session_state.logged_in:
-    render_login()
-else:
-    render_main(st.session_state.user)
