@@ -62,23 +62,36 @@ with col1:
 with col2:
     ais_doc = st.file_uploader("AIS / TIS Document (PDF)", type=["pdf"])
 with col3:
-    stock_ledger = st.file_uploader("Capital Gains/Stock Ledger (PDF)", type=["pdf"])
+    stock_ledger = st.file_uploader("Capital Gains/Stock Ledger (PDF) [OPTIONAL]", type=["pdf"])
 
 st.divider()
 
 # Core Functional Engine Button Execution
 if st.button("Run Fully Automated Verification Pipeline", type="primary"):
-    if not (bank_stmt and ais_doc and stock_ledger):
-        st.error("❌ Process Halting: You must submit all 3 client source vectors (Bank Statement, AIS, & Capital Gains Ledger).")
+    # REVISED CHECK: Only Bank Statement and AIS are hard requirements now
+    if not (bank_stmt and ais_doc):
+        st.error("❌ Process Halting: Bank Statement and AIS / TIS are mandatory core documents.")
     else:
         with st.spinner("Executing secure parsing, mismatch identification matrix, and computing tax laws..."):
             
-            # Step 1: Parse PDFs
+            # Step 1: Parse mandatory PDFs
             bank_text = extract_pdf_text(bank_stmt)
             ais_text = extract_pdf_text(ais_doc)
-            stock_text = extract_pdf_text(stock_ledger)
             
-            # Step 2: Build Multi-Document Analysis Prompt Framework
+            # Step 2: Parse stock ledger ONLY if provided by the user
+            stock_text = ""
+            stock_context_injection = "No stock ledger uploaded. Skip Capital Gains stock matching logic and focus on banking transactions vs AIS mapping."
+            
+            if stock_ledger is not None:
+                stock_text = extract_pdf_text(stock_ledger)
+                stock_context_injection = f"""
+                [CLIENT CAPITAL GAINS LEDGER SAMPLE DATA]:
+                {stock_text[:4000]}
+                
+                Task Extension: Cross-verify Stock transactions sales against metrics mentioned in the AIS data for Capital Gains reporting.
+                """
+            
+            # Step 3: Build Dynamic Multi-Document Analysis Prompt Framework
             orchestration_prompt = f"""
             You are a hyper-intelligent, elite Chartered Accountant agent running a white-label compliance SaaS module.
             Your job is to read unstructured text datasets parsed from raw PDF modules, identify mismatches, apply strict Indian Tax Law under both old & new regimes, and build a precise portal filing manual.
@@ -91,14 +104,13 @@ if st.button("Run Fully Automated Verification Pipeline", type="primary"):
             [CLIENT AIS DOCUMENT SAMPLE DATA]:
             {ais_text[:4000]}
             
-            [CLIENT CAPITAL GAINS LEDGER SAMPLE DATA]:
-            {stock_text[:4000]}
+            {stock_context_injection}
             
             --- END DATASETS ---
 
             Task Execution Instructions:
             1. Cross-reference deposits & dividend/interest entries inside Bank Statements vs AIS records. Find any un-reported items.
-            2. Cross-verify Stock transactions sales against metrics mentioned in the AIS data.
+            2. If stock ledger data is present above, match equity transactions against metrics mentioned in the AIS data. If not present, skip equity verification completely.
             3. Explicitly document any matched and mismatched amounts found.
             4. Generate clear, actionable step-by-step numbers to fill out on the Income Tax Portal (Schedules: BFLA, CYLA, CG, OS).
             
@@ -106,7 +118,7 @@ if st.button("Run Fully Automated Verification Pipeline", type="primary"):
             """
 
             try:
-                # Use standard gemini-1.5-flash for speedy execution and rich context length
+                # Execution call using gemini-1.5-flash
                 model = genai.GenerativeModel('gemini-1.5-flash')
                 response = model.generate_content(orchestration_prompt)
                 ai_output = response.text
@@ -116,7 +128,7 @@ if st.button("Run Fully Automated Verification Pipeline", type="primary"):
                 
                 with tab1:
                     st.subheader("Automated Cross-Verification Report")
-                    st.info("System successfully mapped data streams between banking transactions, stock trades, and tax authority databases.")
+                    st.info("System successfully mapped data streams between banking transactions, stock trades (if provided), and tax authority databases.")
                     st.markdown(ai_output)
                     
                 with tab2:
@@ -129,14 +141,18 @@ if st.button("Run Fully Automated Verification Pipeline", type="primary"):
                     
                 with tab3:
                     st.subheader("Income Tax Portal Utility Filing Route")
+                    
+                    # Dynamically update portal filing steps based on stock ledger existence
+                    cg_step_text = "* **Step 3 (Schedule CG):** Enter short term (STCG) and long term (LTCG) summaries from the Stock Ledger validation step." if stock_ledger else "* **Step 3 (Schedule CG):** Skip or leave blank (no active stock portfolio transactions detected or uploaded)."
+                    
                     st.markdown(f"""
                     ### Proceed with the steps outlined below on the government portal:
                     
-                    * **Step 1:** Log into the Income Tax Portal, choose filing mode as **Online**, select appropriate Form (**ITR-2/ITR-3**).
+                    * **Step 1:** Log into the Income Tax Portal, choose filing mode as **Online**, select appropriate Form (**ITR-1/ITR-2/ITR-3**).
                     * **Step 2 (Schedule OS):** Check off items mapped inside the Reconciliation Matrix under Other Sources (Interest & Dividends).
-                    * **Step 3 (Schedule CG):** Enter short term (STCG) and long term (LTCG) summaries from the Stock Ledger validation step.
+                    {cg_step_text}
                     * **Step 4 (Tax Pay & Verification):** Preview submission. No background backend computation variations remain.
                     """)
                     
             except Exception as e:
-                st.error(f"Failed to execute automated verification pipeline pipeline: {str(e)}")
+                st.error(f"Failed to execute automated verification pipeline: {str(e)}")
