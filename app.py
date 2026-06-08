@@ -541,58 +541,66 @@ class GSTEngine:
 #  Get key: console.groq.com → API Keys (free)
 # ─────────────────────────────────────────────
 
+def _get_secret(key: str) -> str:
+    """Safely read from st.secrets or environment — handles both dict and AttrDict."""
+    try:
+        val = st.secrets[key]
+        return str(val).strip() if val else ""
+    except Exception:
+        return os.environ.get(key, "").strip()
+
+
 def _call_groq(system_prompt: str, user_prompt: str, max_tokens: int = 1500) -> str:
-    """Groq API — free tier, 6000 requests/day, ~instant response."""
-    GROQ_API_KEY = st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY", ""))
-    if not GROQ_API_KEY:
+    """Groq API — free tier, 6000 req/day, no billing needed."""
+    key = _get_secret("GROQ_API_KEY")
+    if not key:
         return "NO_KEY"
 
-    # Groq model priority: llama-3.3-70b → llama-3.1-8b → mixtral
     groq_models = [
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768",
+        "gemma2-9b-it",
     ]
-    payload = json.dumps({
-        "model": groq_models[0],
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": user_prompt}
-        ],
-        "max_tokens": min(max_tokens, 1500),
-        "temperature": 0.3,
-    }).encode()
-
     for model in groq_models:
-        payload_obj = json.loads(payload)
-        payload_obj["model"] = model
+        body = json.dumps({
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt}
+            ],
+            "max_tokens": min(max_tokens, 1500),
+            "temperature": 0.3,
+        }).encode()
         req = urllib.request.Request(
             "https://api.groq.com/openai/v1/chat/completions",
-            data=json.dumps(payload_obj).encode(),
+            data=body,
             headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {GROQ_API_KEY}"
+                "Content-Type":  "application/json",
+                "Authorization": f"Bearer {key}"
             }, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=45) as resp:
                 data = json.loads(resp.read().decode())
-                return data["choices"][0]["message"]["content"]
+                text = data["choices"][0]["message"]["content"]
+                if text:
+                    return text          # ✅ success
         except urllib.error.HTTPError as e:
-            body = e.read().decode()
-            if e.code in (429, 503):
-                continue  # try next model
+            err_body = e.read().decode()
             if e.code == 401:
-                return "INVALID_KEY"
-            return f"GROQ_ERROR:{e.code}"
-        except Exception as e:
-            continue
-    return "QUOTA_EXHAUSTED"
+                return f"GROQ_AUTH_ERROR: Invalid key. Raw={err_body[:120]}"
+            if e.code in (429, 503):
+                continue                # try next model
+            # Any other HTTP error — show raw for debugging
+            return f"GROQ_HTTP_{e.code}: {err_body[:200]}"
+        except Exception as ex:
+            return f"GROQ_EXCEPTION: {str(ex)}"
+    return "GROQ_QUOTA_EXHAUSTED"
 
 
 def _call_gemini(system_prompt: str, user_prompt: str, max_tokens: int = 1500) -> str:
-    """Gemini fallback — used only if Groq fails/missing."""
-    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", os.environ.get("GEMINI_API_KEY", ""))
-    if not GEMINI_API_KEY:
+    """Gemini fallback."""
+    key = _get_secret("GEMINI_API_KEY")
+    if not key:
         return "NO_KEY"
 
     combined = f"{system_prompt}\n\n---\n\nQuery:\n{user_prompt}"
@@ -603,74 +611,80 @@ def _call_gemini(system_prompt: str, user_prompt: str, max_tokens: int = 1500) -
 
     for model in ["gemini-2.0-flash", "gemini-1.5-flash-latest"]:
         url = (f"https://generativelanguage.googleapis.com/v1beta/models/"
-               f"{model}:generateContent?key={GEMINI_API_KEY}")
-        req = urllib.request.Request(url, data=payload,
-                                      headers={"Content-Type": "application/json"}, method="POST")
+               f"{model}:generateContent?key={key}")
+        req = urllib.request.Request(
+            url, data=payload,
+            headers={"Content-Type": "application/json"}, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=45) as resp:
                 data = json.loads(resp.read().decode())
-                return data["candidates"][0]["content"]["parts"][0]["text"]
+                text = data["candidates"][0]["content"]["parts"][0]["text"]
+                if text:
+                    return text
         except urllib.error.HTTPError as e:
+            err_body = e.read().decode()
             if e.code in (429, 400, 404):
                 continue
-            body = e.read().decode()
-            return f"GEMINI_ERROR:{e.code}:{body[:200]}"
-        except Exception:
-            continue
-    return "QUOTA_EXHAUSTED"
+            return f"GEMINI_HTTP_{e.code}: {err_body[:200]}"
+        except Exception as ex:
+            return f"GEMINI_EXCEPTION: {str(ex)}"
+    return "GEMINI_QUOTA_EXHAUSTED"
 
 
 def call_gemini(system_prompt: str, user_prompt: str, max_tokens: int = 1500) -> str:
     """
-    Main AI call — tries Groq first (free, fast), falls back to Gemini.
-    Returns clean response text or a helpful error message.
+    Main AI entry point.
+    Tries Groq first → Gemini fallback → helpful error with debug info.
     """
-    # ── Try Groq first ────────────────────────
+    groq_key   = _get_secret("GROQ_API_KEY")
+    gemini_key = _get_secret("GEMINI_API_KEY")
+
+    # ── Groq ──────────────────────────────────
     groq_result = _call_groq(system_prompt, user_prompt, max_tokens)
-    if groq_result not in ("NO_KEY", "INVALID_KEY", "QUOTA_EXHAUSTED") \
-       and not groq_result.startswith("GROQ_ERROR"):
-        return groq_result  # ✅ Success via Groq
+    # Success = non-empty string that isn't an error sentinel
+    ERROR_SENTINELS = ("NO_KEY","GROQ_QUOTA_EXHAUSTED","GEMINI_QUOTA_EXHAUSTED")
+    if groq_result and not any(groq_result.startswith(s) for s in
+        ("NO_KEY","GROQ_","GEMINI_")):
+        return groq_result   # ✅ Groq worked
 
-    # ── Fall back to Gemini ───────────────────
+    # ── Gemini fallback ───────────────────────
     gemini_result = _call_gemini(system_prompt, user_prompt, max_tokens)
-    if gemini_result not in ("NO_KEY", "QUOTA_EXHAUSTED") \
-       and not gemini_result.startswith("GEMINI_ERROR"):
-        return gemini_result  # ✅ Success via Gemini
+    if gemini_result and not any(gemini_result.startswith(s) for s in
+        ("NO_KEY","GROQ_","GEMINI_")):
+        return gemini_result  # ✅ Gemini worked
 
-    # ── Both failed — return actionable guidance ──
-    groq_missing   = groq_result == "NO_KEY"
-    gemini_missing = gemini_result == "NO_KEY"
+    # ── Both failed — show debug + fix steps ──
+    debug_groq   = groq_result   if groq_result   else "not attempted"
+    debug_gemini = gemini_result if gemini_result else "not attempted"
 
-    if groq_missing and gemini_missing:
+    if not groq_key and not gemini_key:
         return (
-            "⚠️ **No AI API Key Configured**\n\n"
-            "Add at least one key in Streamlit Cloud → Settings → Secrets:\n\n"
-            "**Recommended — Groq (100% Free, no billing ever):**\n"
-            "```\nGROQ_API_KEY = \"your-groq-key\"\n```\n"
-            "Get it free at **[console.groq.com](https://console.groq.com)** → API Keys → Create\n\n"
-            "**Optional — Gemini fallback:**\n"
-            "```\nGEMINI_API_KEY = \"your-gemini-key\"\n```\n"
-            "Get it at **[aistudio.google.com](https://aistudio.google.com)** → Get API Key\n\n"
-            "ITR computation and PDF reports work perfectly without AI."
+            "⚠️ **No AI key found in Streamlit Secrets.**\n\n"
+            "In Streamlit Cloud → Settings → Secrets, add:\n"
+            "```toml\nGROQ_API_KEY = \"gsk_xxxxxxxxxxxx\"\n```\n"
+            "Get a **free** Groq key at **[console.groq.com](https://console.groq.com)** "
+            "→ API Keys → Create API Key."
         )
 
-    if groq_missing:
+    if not groq_key:
         return (
-            "⚠️ **Gemini quota exhausted & Groq key not configured.**\n\n"
-            "**Fix in 2 minutes (completely free):**\n"
-            "1. Go to **[console.groq.com](https://console.groq.com)**\n"
-            "2. Sign up free → API Keys → Create API Key → copy it\n"
-            "3. Streamlit Cloud → Settings → Secrets → add:\n"
-            "```\nGROQ_API_KEY = \"paste-your-key-here\"\n```\n"
-            "4. Save — app restarts, AI works instantly. No billing, no quota issues.\n\n"
-            "ITR computation and PDF reports work perfectly right now."
+            "⚠️ **Gemini quota exhausted. Groq key not set.**\n\n"
+            f"Gemini debug: `{debug_gemini}`\n\n"
+            "**Add Groq key (free, 2 min):**\n"
+            "1. [console.groq.com](https://console.groq.com) → API Keys → Create\n"
+            "2. Streamlit Secrets → add: `GROQ_API_KEY = \"gsk_...\"`\n"
+            "3. Save → app restarts → AI works instantly."
         )
 
+    # Both keys exist but both failed — show raw debug
     return (
-        "⚠️ **Both Groq and Gemini quota exhausted.**\n\n"
-        "Groq resets every minute (6000 req/day free). Try again in 60 seconds.\n"
-        "If this keeps happening, create a new Groq key at "
-        "**[console.groq.com](https://console.groq.com)** — it's free.\n\n"
+        "⚠️ **AI call failed. Debug info:**\n\n"
+        f"**Groq result:** `{debug_groq}`\n\n"
+        f"**Gemini result:** `{debug_gemini}`\n\n"
+        "**Common fixes:**\n"
+        "- Groq 401 → key copied wrongly, regenerate at console.groq.com\n"
+        "- Groq 429 → wait 60s and retry (free tier per-minute limit)\n"
+        "- Gemini 400/429 → quota exhausted, use Groq only\n\n"
         "ITR computation and PDF reports work perfectly right now."
     )
 
