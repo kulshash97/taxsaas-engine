@@ -928,6 +928,12 @@ def render_itr_module(user):
     with c1:
         name = st.text_input("Client Legal Name", placeholder="e.g. Dixith Chakravarthula")
         pan  = st.text_input("PAN Number", placeholder="ABCDE1234F", max_chars=10)
+        if st.button("🔄 New Client (Reset)", help="Click before loading a new client to clear previous data"):
+            for k in ["parsed_gross","parsed_stcg","parsed_ltcg","itr_gross","itr_stcg","itr_ltcg",
+                      "itr_pdf_bytes","opt_pdf_bytes","last_itr_result","ai_itr_response"]:
+                if k in st.session_state:
+                    del st.session_state[k]
+            st.rerun()
     with c2:
         salary    = st.number_input("Salary Income (₹)", min_value=0.0, step=1000.0, format="%.2f")
         other_inc = st.number_input("Other Sources Income (₹)", min_value=0.0, step=1000.0, format="%.2f")
@@ -974,34 +980,63 @@ def render_itr_module(user):
                 unsafe_allow_html=True)
 
     if st.button("🔍  Parse Uploaded Documents", use_container_width=False):
-        with st.spinner("Parsing bank statement & ledger..."):
-            gross, strategy = UniversalBankParser.parse(b_file)
-            ledger_data     = StockLedgerParser.parse(l_file)
-            st.session_state.parsed_gross = gross
-            st.session_state.parsed_stcg  = ledger_data["stcg_111a"]
-            st.session_state.parsed_ltcg  = ledger_data["ltcg_112a"]
-            if gross > 0:
-                st.success(f"✅ Bank parsed via **{strategy}** — Total Credits: ₹{gross:,.2f}")
-            else:
-                st.warning("⚠️ Could not auto-parse bank. Enter Gross Receipts manually below.")
+        # Always reset parsed values first to avoid stale data from previous client
+        st.session_state.parsed_gross = 0.0
+        st.session_state.parsed_stcg  = 0.0
+        st.session_state.parsed_ltcg  = 0.0
+
+        if b_file:
+            with st.spinner("Parsing bank statement..."):
+                gross, strategy = UniversalBankParser.parse(b_file)
+                st.session_state.parsed_gross = gross
+                if gross > 0:
+                    st.success(f"✅ Bank parsed ({strategy}) — Gross Receipts: Rs. {gross:,.2f}")
+                else:
+                    st.warning("⚠️ Could not auto-read bank statement. Enter gross receipts manually.")
+        else:
+            st.info("ℹ️ No bank statement uploaded — enter Gross Receipts manually below.")
+
+        if l_file:
+            with st.spinner("Parsing stock ledger..."):
+                ledger_data = StockLedgerParser.parse(l_file)
+                st.session_state.parsed_stcg = ledger_data["stcg_111a"]
+                st.session_state.parsed_ltcg = ledger_data["ltcg_112a"]
+                if ledger_data["stcg_111a"] > 0 or ledger_data["ltcg_112a"] > 0:
+                    st.success(f"✅ Ledger parsed — STCG: Rs. {ledger_data['stcg_111a']:,.2f} | LTCG: Rs. {ledger_data['ltcg_112a']:,.2f}")
+                else:
+                    st.info("ℹ️ No capital gains found in ledger (or enter manually).")
+
+    # Sync parsed values into widget keys so fields update after parse
+    if "itr_gross" not in st.session_state:
+        st.session_state["itr_gross"] = 0.0
+    if "itr_stcg" not in st.session_state:
+        st.session_state["itr_stcg"] = 0.0
+    if "itr_ltcg" not in st.session_state:
+        st.session_state["itr_ltcg"] = 0.0
+    # Push parsed values into widget state only when they change
+    if st.session_state.get("parsed_gross", 0.0) > 0:
+        st.session_state["itr_gross"] = float(st.session_state["parsed_gross"])
+    if st.session_state.get("parsed_stcg", 0.0) > 0:
+        st.session_state["itr_stcg"] = float(st.session_state["parsed_stcg"])
+    if st.session_state.get("parsed_ltcg", 0.0) > 0:
+        st.session_state["itr_ltcg"] = float(st.session_state["parsed_ltcg"])
 
     ov1, ov2, ov3 = st.columns(3)
     with ov1:
         gross_receipts = st.number_input(
-            "✏️ Gross Receipts / Total Bank Credits (₹)",
-            value=float(st.session_state.get("parsed_gross", 0.0)),
+            "Gross Receipts / Total Bank Credits (Rs.)",
             min_value=0.0, step=100.0, format="%.2f", key="itr_gross",
-            help="Auto-filled from bank parse. Edit if incorrect.")
+            help="Auto-filled from bank statement parse. Edit if incorrect.")
     with ov2:
         stcg_val = st.number_input(
-            "✏️ STCG — Sec 111A Listed Equity (₹)",
-            value=float(st.session_state.get("parsed_stcg", 0.0)),
-            min_value=0.0, step=100.0, format="%.2f", key="itr_stcg")
+            "STCG — Sec 111A Listed Equity (Rs.)",
+            min_value=0.0, step=100.0, format="%.2f", key="itr_stcg",
+            help="Auto-filled from stock P&L ledger. Edit if incorrect.")
     with ov3:
         ltcg_val = st.number_input(
-            "✏️ LTCG — Sec 112A Listed Equity (₹)",
-            value=float(st.session_state.get("parsed_ltcg", 0.0)),
-            min_value=0.0, step=100.0, format="%.2f", key="itr_ltcg")
+            "LTCG — Sec 112A Listed Equity (Rs.)",
+            min_value=0.0, step=100.0, format="%.2f", key="itr_ltcg",
+            help="Auto-filled from stock P&L ledger. Edit if incorrect.")
 
     # ── STEP 2: COMPUTE + AI DUAL REPORT ──────
     st.markdown('<div class="section-header">Step 2 — Compute Tax + AI Dual Report (Standard & Credit Optimized)</div>',
@@ -1025,22 +1060,20 @@ def render_itr_module(user):
 
         regime_key = "NEW" if "NEW" in regime else "OLD"
 
-        # ── AUTO-PARSE documents if uploaded and not yet parsed ──────────
-        if b_file and st.session_state.get("parsed_gross", 0.0) == 0.0:
-            with st.spinner("Auto-parsing bank statement..."):
+        # ── USE widget values directly (already synced from parse step) ──
+        # gross_receipts, stcg_val, ltcg_val come from the number_input widgets
+        # which were updated by the parse step above — no separate auto-parse needed
+        final_gross = gross_receipts   # widget value = user-verified figure
+        final_stcg  = stcg_val
+        final_ltcg  = ltcg_val
+
+        # Safety: if gross is still 0 and bank file exists, parse now
+        if final_gross == 0.0 and b_file:
+            with st.spinner("Parsing bank statement..."):
                 auto_gross, auto_strat = UniversalBankParser.parse(b_file)
                 if auto_gross > 0:
-                    st.session_state.parsed_gross = auto_gross
-                    st.info(f"Auto-parsed via {auto_strat}: Rs. {auto_gross:,.2f}")
-        if l_file and st.session_state.get("parsed_stcg", 0.0) == 0.0:
-            auto_ledger = StockLedgerParser.parse(l_file)
-            st.session_state.parsed_stcg = auto_ledger["stcg_111a"]
-            st.session_state.parsed_ltcg = auto_ledger["ltcg_112a"]
-
-        # Use latest parsed or manually entered values
-        final_gross = st.session_state.get("parsed_gross", 0.0) or gross_receipts
-        final_stcg  = st.session_state.get("parsed_stcg",  0.0) or stcg_val
-        final_ltcg  = st.session_state.get("parsed_ltcg",  0.0) or ltcg_val
+                    final_gross = auto_gross
+                    st.info(f"Bank auto-parsed: Rs. {auto_gross:,.2f}")
 
         with st.spinner("Running tax computation matrix..."):
             # ── Standard computation ──
