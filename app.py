@@ -7,6 +7,11 @@ Kulkarni Strategic Partners | AY 2026-27
 """
 
 import os, io, re, json, time, urllib.request
+try:
+    from groq import Groq as GroqClient
+    GROQ_SDK = True
+except ImportError:
+    GROQ_SDK = False
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -551,10 +556,12 @@ def _get_secret(key: str) -> str:
 
 
 def _call_groq(system_prompt: str, user_prompt: str, max_tokens: int = 1500) -> str:
-    """Groq API — free tier, 6000 req/day, no billing needed."""
+    """Groq via official SDK — avoids Cloudflare 403 that urllib triggers."""
     key = _get_secret("GROQ_API_KEY")
     if not key:
         return "NO_KEY"
+    if not GROQ_SDK:
+        return "GROQ_SDK_MISSING"
 
     groq_models = [
         "llama-3.3-70b-versatile",
@@ -562,38 +569,27 @@ def _call_groq(system_prompt: str, user_prompt: str, max_tokens: int = 1500) -> 
         "gemma2-9b-it",
     ]
     for model in groq_models:
-        body = json.dumps({
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt}
-            ],
-            "max_tokens": min(max_tokens, 1500),
-            "temperature": 0.3,
-        }).encode()
-        req = urllib.request.Request(
-            "https://api.groq.com/openai/v1/chat/completions",
-            data=body,
-            headers={
-                "Content-Type":  "application/json",
-                "Authorization": f"Bearer {key}"
-            }, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=45) as resp:
-                data = json.loads(resp.read().decode())
-                text = data["choices"][0]["message"]["content"]
-                if text:
-                    return text          # ✅ success
-        except urllib.error.HTTPError as e:
-            err_body = e.read().decode()
-            if e.code == 401:
-                return f"GROQ_AUTH_ERROR: Invalid key. Raw={err_body[:120]}"
-            if e.code in (429, 503):
-                continue                # try next model
-            # Any other HTTP error — show raw for debugging
-            return f"GROQ_HTTP_{e.code}: {err_body[:200]}"
+            client = GroqClient(api_key=key)
+            resp   = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": user_prompt},
+                ],
+                max_tokens=min(max_tokens, 1500),
+                temperature=0.3,
+            )
+            text = resp.choices[0].message.content
+            if text:
+                return text
         except Exception as ex:
-            return f"GROQ_EXCEPTION: {str(ex)}"
+            err = str(ex)
+            if "429" in err or "rate_limit" in err.lower():
+                continue        # try next model
+            if "401" in err or "invalid" in err.lower():
+                return f"GROQ_AUTH_ERROR: {err[:150]}"
+            return f"GROQ_EXCEPTION: {err[:200]}"
     return "GROQ_QUOTA_EXHAUSTED"
 
 
@@ -642,10 +638,13 @@ def call_gemini(system_prompt: str, user_prompt: str, max_tokens: int = 1500) ->
     # ── Groq ──────────────────────────────────
     groq_result = _call_groq(system_prompt, user_prompt, max_tokens)
     # Success = non-empty string that isn't an error sentinel
-    ERROR_SENTINELS = ("NO_KEY","GROQ_QUOTA_EXHAUSTED","GEMINI_QUOTA_EXHAUSTED")
     if groq_result and not any(groq_result.startswith(s) for s in
         ("NO_KEY","GROQ_","GEMINI_")):
         return groq_result   # ✅ Groq worked
+
+    # If SDK missing — show install message immediately
+    if groq_result == "GROQ_SDK_MISSING":
+        st.warning("⚠️ `groq` package not installed yet — Streamlit is still deploying. Wait 60s and refresh.")
 
     # ── Gemini fallback ───────────────────────
     gemini_result = _call_gemini(system_prompt, user_prompt, max_tokens)
