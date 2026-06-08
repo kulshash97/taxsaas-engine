@@ -482,7 +482,7 @@ class TaxEngine:
                 "NET TAX PAYABLE":            round(final_tax, 2),
             },
             "compliance_flags": {
-                "Sec 44AB Audit Required":    "YES ⚠️" if audit_req else "NO ✅",
+                "Sec 44AB Audit Required":    "YES - AUDIT REQUIRED" if audit_req else "NO - Not Required",
                 "Foreign Assets (Schedule FA)": "YES — Required" if self.has_foreign_assets else "NOT APPLICABLE",
                 "Directorship / Unlisted":    "YES — ITR-3 Mandatory" if self.is_director else "NOT APPLICABLE",
                 "Agricultural Income":        "YES — Partial Integration" if self.has_agri_over_5k else "NOT APPLICABLE",
@@ -710,8 +710,23 @@ For dual-report requests, always produce BOTH: (A) Standard Compliance and (B) C
 #  PDF GENERATOR — ITR REPORT
 # ─────────────────────────────────────────────
 def _r(amount: float) -> str:
-    """Format currency for PDF — uses Rs. instead of ₹ (ReportLab font safe)."""
-    return f"Rs. {amount:,.2f}"
+    """Indian numbering format for PDF. Rs. 5,90,235.00 style."""
+    s = f"{abs(amount):.2f}"
+    integer_part, decimal_part = s.split(".")
+    if len(integer_part) <= 3:
+        formatted = integer_part
+    else:
+        last3 = integer_part[-3:]
+        rest   = integer_part[:-3]
+        groups = []
+        while len(rest) > 2:
+            groups.append(rest[-2:])
+            rest = rest[:-2]
+        if rest:
+            groups.append(rest)
+        formatted = ",".join(reversed(groups)) + "," + last3
+    sign = "-" if amount < 0 else ""
+    return f"Rs. {sign}{formatted}.{decimal_part}"
 
 
 def generate_itr_pdf(name, pan, firm, result, report_type="Standard Compliance"):
@@ -1010,12 +1025,29 @@ def render_itr_module(user):
 
         regime_key = "NEW" if "NEW" in regime else "OLD"
 
+        # ── AUTO-PARSE documents if uploaded and not yet parsed ──────────
+        if b_file and st.session_state.get("parsed_gross", 0.0) == 0.0:
+            with st.spinner("Auto-parsing bank statement..."):
+                auto_gross, auto_strat = UniversalBankParser.parse(b_file)
+                if auto_gross > 0:
+                    st.session_state.parsed_gross = auto_gross
+                    st.info(f"Auto-parsed via {auto_strat}: Rs. {auto_gross:,.2f}")
+        if l_file and st.session_state.get("parsed_stcg", 0.0) == 0.0:
+            auto_ledger = StockLedgerParser.parse(l_file)
+            st.session_state.parsed_stcg = auto_ledger["stcg_111a"]
+            st.session_state.parsed_ltcg = auto_ledger["ltcg_112a"]
+
+        # Use latest parsed or manually entered values
+        final_gross = st.session_state.get("parsed_gross", 0.0) or gross_receipts
+        final_stcg  = st.session_state.get("parsed_stcg",  0.0) or stcg_val
+        final_ltcg  = st.session_state.get("parsed_ltcg",  0.0) or ltcg_val
+
         with st.spinner("Running tax computation matrix..."):
             # ── Standard computation ──
             eng = TaxEngine()
-            eng.gross_receipts       = gross_receipts
-            eng.stcg_111a            = stcg_val
-            eng.ltcg_112a            = ltcg_val
+            eng.gross_receipts       = final_gross
+            eng.stcg_111a            = final_stcg
+            eng.ltcg_112a            = final_ltcg
             eng.salary_income        = salary
             eng.other_sources_income = other_inc
             eng.total_deductions     = deductions
@@ -1027,9 +1059,9 @@ def render_itr_module(user):
             # ── Alternate regime computation ──
             alt_regime = "OLD" if regime_key == "NEW" else "NEW"
             eng2 = TaxEngine()
-            eng2.gross_receipts       = gross_receipts
-            eng2.stcg_111a            = stcg_val
-            eng2.ltcg_112a            = ltcg_val
+            eng2.gross_receipts       = final_gross
+            eng2.stcg_111a            = final_stcg
+            eng2.ltcg_112a            = final_ltcg
             eng2.salary_income        = salary
             eng2.other_sources_income = other_inc
             eng2.total_deductions     = deductions
